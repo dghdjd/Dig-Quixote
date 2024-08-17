@@ -1,0 +1,7 @@
+
+# Executables
+*.out
+.vs/
+out/
+build/
+ext/project_path.hpp
