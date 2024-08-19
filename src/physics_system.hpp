@@ -9,7 +9,7 @@
 class PhysicsSystem
 {
 public:
-	void step(float elapsed_ms, std::vector<std::vector<std::vector<Entity>>> grid, int flag);
+	void step(float elapsed_ms, std::vector<std::vector<std::vector<Entity>>> grid, bool IsTutorial);
 	static bool collides_pos(const vec2 pos, const Motion& motion2);
 	static bool collides(const Motion& motion1, const Motion& motion2);
 	static bool collidesVertically(const Motion& motion1, const Motion& motion2);

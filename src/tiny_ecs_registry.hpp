@@ -26,8 +26,8 @@ public:
 	ComponentContainer<Button> buttons;
 	ComponentContainer<Number> number;
 	ComponentContainer<Background> background;
-	ComponentContainer<Physics> physics;
-	ComponentContainer<PebbleShell> pebbleShells;
+	ComponentContainer<Particle> particle;
+	ComponentContainer<Lava> lava;
 	ComponentContainer<ParticleCollision> particleCollisions;
 
 	ComponentContainer<Game> game;
@@ -57,8 +57,8 @@ public:
 		registry_list.push_back(&background);
 		registry_list.push_back(&number);
 //		registry_list.push_back(&hardShells);
-		registry_list.push_back(&physics);
-		registry_list.push_back(&pebbleShells);
+		registry_list.push_back(&particle);
+		registry_list.push_back(&lava);
 		registry_list.push_back(&particleCollisions);
 		registry_list.push_back(&debugComponents);
 		registry_list.push_back(&colors);

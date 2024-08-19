@@ -3,6 +3,8 @@
 #include "world_init.hpp"
 #include "world_system.hpp"
 #include "iostream"
+#include <chrono>
+#include <thread>
 // Returns the local bounding coordinates scaled by the current size of the entity
 vec2 get_bounding_box(const Motion &motion)
 {
@@ -313,6 +315,11 @@ void calculate_new_velocity1(Motion& motion1, Motion& motion2, bool isBlock) {
 	motion2.velocity = new_speed2;
 }
 
+
+
+
+
+
 void PhysicsSystem::handleParticleCollision()
 {
 	auto& collisionsRegistry1 = registry.particleCollisions;
@@ -321,9 +328,9 @@ void PhysicsSystem::handleParticleCollision()
 		Entity entity = collisionsRegistry1.entities[i];
 		Entity entity_other = collisionsRegistry1.components[i].other_entity;
 
-		if (registry.physics.has(entity) && registry.pebbleShells.has(entity_other))
+		if (registry.particle.has(entity) && registry.lava.has(entity_other))
 		{
-			Physics& physics = registry.physics.get(entity);
+			Particle& physics = registry.particle.get(entity);
 			Motion& motion1 = registry.motions.get(entity);
 
 			motion1.velocity.y = 0.f;
@@ -335,7 +342,7 @@ void PhysicsSystem::handleParticleCollision()
 			physics.collision = true;
 			
 		}
-		if (registry.physics.has(entity) && registry.players.has(entity_other))
+		if (registry.particle.has(entity) && registry.players.has(entity_other))
 		{
 			Motion& p_motion = registry.motions.get(entity_other);
 			Motion& par_motion = registry.motions.get(entity);
@@ -361,7 +368,30 @@ vec2 PhysicsSystem::checkBoundaryPlayer(const Motion& motion, Player& player) {
 	return vec2(b_left, b_right);
 }
 
-void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<Entity>>> grid, int flag)
+
+
+
+//void parallelCollisionDetection(std::vector<std::vector<std::vector<Entity>>> grid) {
+//	int numThreads = std::thread::hardware_concurrency();
+//	std::vector<std::thread> threads;
+//
+//	int gridHeight = grid.size();
+//	int rowsPerThread = gridHeight / numThreads;
+//
+//	for (int i = 0; i < numThreads; ++i) {
+//		int startY = i * rowsPerThread;
+//		int endY = (i == numThreads - 1) ? gridHeight : startY + rowsPerThread;
+//		threads.emplace_back(checkCollisionsInChunk, startY, endY, 0, grid[0].size(), std::ref(grid));
+//	}
+//
+//	for (auto& thread : threads) {
+//		thread.join();  // Wait for all threads to finish
+//	}
+//}
+
+
+
+void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<Entity>>> grid, bool IsTutorial)
 {
 	// Move fish based on how much time has passed, this is to (partially) avoid
 	// having entities move at different speed based on the machine.
@@ -370,6 +400,14 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 	float gravity = 980.f;
 	auto &motion_container = registry.motions;
 	auto &grav_container = registry.gravities;
+	bool performanceTimer = false;
+	auto start = std::chrono::high_resolution_clock::now();
+	if (motion_container.size() >= 400)
+	{
+		performanceTimer = true;
+		start = std::chrono::high_resolution_clock::now();
+	}
+		
 	vec2 boundary;
 	for (uint i = 1; i < motion_container.size(); i++)
 	{
@@ -464,9 +502,9 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 			motion.position.y += motion.velocity.y * step_seconds;
 		} 
-		else if (registry.physics.has(entity))
+		else if (registry.particle.has(entity))
 		{
-			Physics& physics = registry.physics.get(entity);
+			Particle& physics = registry.particle.get(entity);
 			if (!physics.collision) physics.gravity = 98.f / 2.f;
 			float gravity = physics.gravity;
 			motion.velocity.y += gravity * step_seconds;
@@ -494,6 +532,14 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 
 
+	if (performanceTimer)
+	{
+		auto end = std::chrono::high_resolution_clock::now();
+
+		// Calculate the duration
+		std::chrono::duration<double, std::milli> duration = end - start;
+		std::cout << "Time taken by loop: " << duration.count() << " ms" << std::endl;
+	}
 
 
 
@@ -503,8 +549,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 
 
-
-
+	
 
 	////// Gravity
 	for (Entity entity : registry.gravities.entities)
@@ -522,10 +567,15 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 	}
 
-	
 
-	if (flag == 0) 
-		goto COLLISION2;
+	//timer:
+	start = std::chrono::high_resolution_clock::now(); 
+	std::chrono::duration<double, std::milli> duration1 = start - start;
+	auto end1 = start;
+
+
+	//if (flag == 0) 
+	//	goto COLLISION2;
 	for (int y = 0; y < grid.size(); y++) {      // Iterate over rows
 		for (int x = 0; x < grid.size(); x++) {  // Iterate over columns in each row
 			// Access the cell at (x, y)
@@ -542,17 +592,17 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 				bool is_playeri = registry.players.has(cell[i]);
 				bool is_blocki = registry.blocks.has(cell[i]);
 				bool is_rock1 = registry.gravities.has(cell[i]);
-				bool is_particlei = registry.physics.has(cell[i]);
-				bool is_lavai = registry.pebbleShells.has(cell[i]);
+				bool is_particlei = registry.particle.has(cell[i]);
+				bool is_lavai = registry.lava.has(cell[i]);
 
 				for (int j = 0; j < cell.size(); j++)
 				{
-					if (!registry.motions.has(cell[j])) continue;
+					if (!registry.motions.has(cell[j]) || i == j) continue;
 					Motion& motion_j = registry.motions.get(cell[j]);
 					Entity& entity_j = cell[j];
 					bool is_blockj = registry.blocks.has(cell[j]);
-					bool is_particlej = registry.physics.has(cell[j]);
-					bool is_lavaj = registry.pebbleShells.has(cell[j]);
+					bool is_particlej = registry.particle.has(cell[j]);
+					bool is_lavaj = registry.lava.has(cell[j]);
 					if ((is_playeri && is_blockj))   //checking player
 					{
 
@@ -580,7 +630,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 					}
 					else if (is_blocki && is_blockj)  //checking rocks
 					{
-						bool isRock = registry.blocks.get(cell[i]).type == 1;
+						bool isRock = registry.gravities.has(cell[i]) == 1;
 						bool collided = false;
 						if (isRock)
 						{
@@ -606,15 +656,15 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 						}
 					}
-					else if (is_particlei)
+					else if (is_particlei) 
 					{
-						Physics& physics = registry.physics.get(cell[i]);
-						Motion& motion1 = registry.motions.get(cell[i]);
-						Motion& motion2 = registry.motions.get(cell[j]);
+						Particle& physics = registry.particle.get(cell[i]);
+						//Motion& motion1 = registry.motions.get(cell[i]);
+						//Motion& motion2 = registry.motions.get(cell[j]);
 						physics.collision = false;
-						if (is_particlej)
+						if (is_particlej)  // particle collision
 						{
-							if (!registry.pebbleShells.has(entity_i) && !registry.pebbleShells.has(entity_j))
+							if (!registry.lava.has(entity_i) && !registry.lava.has(entity_j))
 							{
 								if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
 								{
@@ -625,29 +675,29 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 
 						}
-						if (is_blockj)
+						if (is_blockj && !IsTutorial) //skip particle collision in tutorial
 						{
 							if (particles_blocks_collide(motion_i, motion_j))
 							{
 								if (is_lavai)
 								{
-									PebbleShell& p = registry.pebbleShells.get(cell[i]);
-									bool horizontal = isHorizontal(motion1, motion2);
+									Lava& p = registry.lava.get(cell[i]);
+									bool horizontal = isHorizontal(motion_i, motion_j);
 									if (!horizontal)
 									{
-										calculate_new_velocity_lava(motion1, p.ifHit);
+										calculate_new_velocity_lava(motion_i, p.ifHit);
 										p.ifHit = true;
 									}
 									if (horizontal)
 									{
-										motion1.velocity.x *= -1;
+										motion_i.velocity.x *= -1;
 									}
 
 								}
 								else
 								{
-									motion1.velocity.y = 0.f;
-									motion1.velocity.x = 0.f;
+									motion_i.velocity.y = 0.f;
+									motion_i.velocity.x = 0.f;
 
 								}
 
@@ -669,8 +719,8 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 
 
-						if (motion1.position.x - motion1.scale.x <= boundary.x || motion1.position.x + motion1.scale.x >= boundary.y)
-							motion1.velocity.x *= -1;
+						if (motion_i.position.x - motion_i.scale.x <= boundary.x || motion_i.position.x + motion_i.scale.x >= boundary.y)
+							motion_i.velocity.x *= -1;
 					}
 				}
 
@@ -707,6 +757,8 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 				}
 				else
 				{
+					
+					auto start1 = std::chrono::high_resolution_clock::now();
 
 					// Check collisions with adjacent cells
 					for (int adjY = y - 1; adjY <= y + 1; adjY++) {
@@ -719,8 +771,8 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 									Motion& motion_j = registry.motions.get(adjacentCell[k]);
 									Entity& entity_j = adjacentCell[k];
 									bool is_blockj = registry.blocks.has(adjacentCell[k]);
-									bool is_particlej = registry.physics.has(adjacentCell[k]);
-									bool is_lavaj = registry.pebbleShells.has(adjacentCell[k]);
+									bool is_particlej = registry.particle.has(adjacentCell[k]);
+									bool is_lavaj = registry.lava.has(adjacentCell[k]);
 
 
 									if (is_playeri && is_blockj) {
@@ -743,7 +795,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 									{
 										if (is_particlej)
 										{
-											if (!registry.pebbleShells.has(entity_i) && !registry.pebbleShells.has(entity_j))
+											if (!registry.lava.has(entity_i) && !registry.lava.has(entity_j))
 											{
 												if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
 												{
@@ -752,16 +804,17 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 												}
 											}
 										}
-										if (is_blockj)
+
+										if (is_blockj && !IsTutorial)//if is tutorial, skip particle collision check
 										{
 											if (particles_blocks_collide(motion_i, motion_j))
 											{
-												Physics& physics = registry.physics.get(cell[i]);
+												Particle& physics = registry.particle.get(cell[i]);
 												Motion& motion1 = registry.motions.get(adjacentCell[k]);
 												Motion& motion2 = registry.motions.get(adjacentCell[k]);
 												if (is_lavai)
 												{
-													PebbleShell& p = registry.pebbleShells.get(cell[i]);
+													Lava& p = registry.lava.get(cell[i]);
 													bool horizontal = isHorizontal(motion1, motion2);
 													if (!horizontal)
 													{
@@ -787,6 +840,14 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 							}
 						}
 					}
+					if (performanceTimer)
+					{
+						auto end1 = std::chrono::high_resolution_clock::now();
+
+						// Calculate the duration
+						duration1 += end1 - start1;
+						
+					}
 
 				}
 
@@ -801,141 +862,151 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 		}
 	}
 
+	if (performanceTimer)
+	{
+		auto end = std::chrono::high_resolution_clock::now();
+
+		// Calculate the duration
+		std::chrono::duration<double, std::milli> duration = end - start;
+		std::cout << "Time taken by Whole collision check: " << duration.count() << " ms" << std::endl;
+		std::cout << "Time taken by adj check: " << duration1.count() << " ms" << std::endl;
+	}
+
 
 	return;
 
 
-COLLISION2:
+COLLISION2:  // old collision check
 
 	// Check for collisions between all moving entities
-	for (uint i = 0; i < motion_container.components.size(); i++)
-	{
-		
-		Motion &motion_i = motion_container.components[i];
-		Entity entity_i = motion_container.entities[i];
-		
-		if (registry.background.has(entity_i)) continue;
-		// note starting j at i+1 to compare all (i,j) pairs only once (and to not compare with itself)
-		for (uint j = i + 1; j < motion_container.components.size(); j++)
-		{
-			Motion &motion_j = motion_container.components[j];
-			Entity entity_j = motion_container.entities[j];
-			bool isParCollision = false;
+	//for (uint i = 0; i < motion_container.components.size(); i++)
+	//{
+	//	
+	//	Motion &motion_i = motion_container.components[i];
+	//	Entity entity_i = motion_container.entities[i];
+	//	
+	//	if (registry.background.has(entity_i)) continue;
+	//	// note starting j at i+1 to compare all (i,j) pairs only once (and to not compare with itself)
+	//	for (uint j = i + 1; j < motion_container.components.size(); j++)
+	//	{
+	//		Motion &motion_j = motion_container.components[j];
+	//		Entity entity_j = motion_container.entities[j];
+	//		bool isParCollision = false;
 
-			if (registry.physics.has(entity_i) && registry.physics.has(entity_j))
-			{
-				if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
-				{
-					calculate_new_velocity1(motion_i, motion_j, false);
-					continue;
-				}
+	//		if (registry.physics.has(entity_i) && registry.physics.has(entity_j))
+	//		{
+	//			if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
+	//			{
+	//				calculate_new_velocity1(motion_i, motion_j, false);
+	//				continue;
+	//			}
 
-			}
+	//		}
 
-			else if (registry.players.has(entity_i))
-			{
-				bool collisionDetected = false;
+	//		else if (registry.players.has(entity_i))
+	//		{
+	//			bool collisionDetected = false;
 
-				// If entity_j is a mesh, check for polygon collision
-				if (registry.meshPtrs.has(entity_j))
-				{
-					Mesh *meshPtr = registry.meshPtrs.get(entity_j);
+	//			// If entity_j is a mesh, check for polygon collision
+	//			if (registry.meshPtrs.has(entity_j))
+	//			{
+	//				Mesh *meshPtr = registry.meshPtrs.get(entity_j);
 
-					// 	// std::cout << "Polygon vertices: ";
-					// 	// for (const vec2 &vertex : polygonVertices)
-					// 	// {
-					// 	// 	std::cout << "(" << vertex.x << ", " << vertex.y << ") ";
-					// 	// }
-					// 	// std::cout << std::endl;
+	//				// 	// std::cout << "Polygon vertices: ";
+	//				// 	// for (const vec2 &vertex : polygonVertices)
+	//				// 	// {
+	//				// 	// 	std::cout << "(" << vertex.x << ", " << vertex.y << ") ";
+	//				// 	// }
+	//				// 	// std::cout << std::endl;
 
-					if (meshPtr)
-					{
-						std::vector<vec2> relativePolygonVertices = meshPtr->extractPolygonVertices();
+	//				if (meshPtr)
+	//				{
+	//					std::vector<vec2> relativePolygonVertices = meshPtr->extractPolygonVertices();
 
-						vec2 objectPosition = motion_j.position;
+	//					vec2 objectPosition = motion_j.position;
 
-						vec2 scaleValue = motion_j.scale;
+	//					vec2 scaleValue = motion_j.scale;
 
-						std::vector<vec2> absolutePolygonVertices;
-						for (const vec2 &vertex : relativePolygonVertices)
-						{
-							vec2 scaledVertex = vertex * scaleValue;
-							absolutePolygonVertices.push_back(scaledVertex + objectPosition);
-						}
+	//					std::vector<vec2> absolutePolygonVertices;
+	//					for (const vec2 &vertex : relativePolygonVertices)
+	//					{
+	//						vec2 scaledVertex = vertex * scaleValue;
+	//						absolutePolygonVertices.push_back(scaledVertex + objectPosition);
+	//					}
 
-						if (collides_with_polygon(motion_i, absolutePolygonVertices))
-						{
-							collisionDetected = true;
-						}
-					}
-					else
-					{
-						std::cout << "Mesh pointer for entity is NULL!" << std::endl;
-					}
-				}
-				else // Otherwise, check for basic collision
-				{
-					if (registry.physics.has(entity_j)) continue;
-					
-					if (collides(motion_i, motion_j))
-					{
-						collisionDetected = true;
-						// std::cout << "collisionDetected" << std::endl;
-					}
-				}
+	//					if (collides_with_polygon(motion_i, absolutePolygonVertices))
+	//					{
+	//						collisionDetected = true;
+	//					}
+	//				}
+	//				else
+	//				{
+	//					std::cout << "Mesh pointer for entity is NULL!" << std::endl;
+	//				}
+	//			}
+	//			else // Otherwise, check for basic collision
+	//			{
+	//				if (registry.physics.has(entity_j)) continue;
+	//				
+	//				if (collides(motion_i, motion_j))
+	//				{
+	//					collisionDetected = true;
+	//					// std::cout << "collisionDetected" << std::endl;
+	//				}
+	//			}
 
-				// If collision detected, handle collision
-				if (collisionDetected)
-				{
-					// Create a collisions event
-					vec2 delta = motion_i.position - motion_j.position;
+	//			// If collision detected, handle collision
+	//			if (collisionDetected)
+	//			{
+	//				// Create a collisions event
+	//				vec2 delta = motion_i.position - motion_j.position;
 
-					if (abs(delta.x) < abs(delta.y))
-					{
-						if (delta.y <= 0)
-						{
-							motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
-							//motion_j.position.y = motion_i.position.y - motion_i.scale.y / 2 + motion_j.scale.y / 2;
-						}
-						//else{
-						// 	motion_j.position.y = motion_i.position.y - motion_i.scale.y / 2 - motion_j.scale.y / 2;
-						// }
-					}
-					// We are abusing the ECS system a bit in that we potentially insert multiple collisions for the same entity
-					registry.collisions.emplace_with_duplicates(entity_i, entity_j);
-					registry.collisions.emplace_with_duplicates(entity_j, entity_i);
-				}
-				
-				else {
-					player1->moveable_down = true;
-					player1->moveable_up = true;
-					player1->moveable_right = true;
-					player1->moveable_left = true;
-				}
-			}
-			else if (collides1(motion_i, motion_j, &isParCollision))
-			{
-				if (isParCollision)
-				{
-					registry.particleCollisions.emplace_with_duplicates(entity_i, entity_j);
-					registry.particleCollisions.emplace_with_duplicates(entity_j, entity_i);
-					continue;
-				}
-			}
-			/*else
-			{
-				if (registry.physics.has(entity_i))
-				{
-					registry.physics.get(entity_i).collision = false;
-				}
-				if (registry.physics.has(entity_j))
-				{
-					registry.physics.get(entity_j).collision = false;
-				}
-			}*/
+	//				if (abs(delta.x) < abs(delta.y))
+	//				{
+	//					if (delta.y <= 0)
+	//					{
+	//						motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
+	//						//motion_j.position.y = motion_i.position.y - motion_i.scale.y / 2 + motion_j.scale.y / 2;
+	//					}
+	//					//else{
+	//					// 	motion_j.position.y = motion_i.position.y - motion_i.scale.y / 2 - motion_j.scale.y / 2;
+	//					// }
+	//				}
+	//				// We are abusing the ECS system a bit in that we potentially insert multiple collisions for the same entity
+	//				registry.collisions.emplace_with_duplicates(entity_i, entity_j);
+	//				registry.collisions.emplace_with_duplicates(entity_j, entity_i);
+	//			}
+	//			
+	//			else {
+	//				player1->moveable_down = true;
+	//				player1->moveable_up = true;
+	//				player1->moveable_right = true;
+	//				player1->moveable_left = true;
+	//			}
+	//		}
+	//		else if (collides1(motion_i, motion_j, &isParCollision))
+	//		{
+	//			if (isParCollision)
+	//			{
+	//				registry.particleCollisions.emplace_with_duplicates(entity_i, entity_j);
+	//				registry.particleCollisions.emplace_with_duplicates(entity_j, entity_i);
+	//				continue;
+	//			}
+	//		}
+	//		/*else
+	//		{
+	//			if (registry.physics.has(entity_i))
+	//			{
+	//				registry.physics.get(entity_i).collision = false;
+	//			}
+	//			if (registry.physics.has(entity_j))
+	//			{
+	//				registry.physics.get(entity_j).collision = false;
+	//			}
+	//		}*/
 
-			
-		}
-	}
+	//		
+	//	}
+	//}
 	handleParticleCollision();
 }

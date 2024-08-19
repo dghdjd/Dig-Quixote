@@ -46,12 +46,12 @@ int main()
 		float elapsed_ms =
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
 		t = now;
-		int flag;
+		bool IsTutorial;
 		std::vector<std::vector<std::vector<Entity>>> list;
-		list = world_system.step(elapsed_ms,flag);
+		list = world_system.step(elapsed_ms, IsTutorial);
 
 		
-		physics_system.step(elapsed_ms, list, flag);
+		physics_system.step(elapsed_ms, list, IsTutorial);
 
 		world_system.handle_collisions();
 

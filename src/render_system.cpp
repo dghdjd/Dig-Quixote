@@ -186,10 +186,82 @@ void RenderSystem::updateNumbers(int start, GLuint vbo, GLuint ibo, GEOMETRY_BUF
 
 }
 
+
+void RenderSystem::drawInstancedParticles(Entity entity, const mat3& projection, float elapsed_ms) {
+	// Prepare vectors to store instance data
+	std::vector<glm::vec3> positions;
+	std::vector<glm::vec3> colors;
+	std::vector<glm::vec2> scales;
+
+	// Iterate over all particle entities
+	for (Entity particleEntity : registry.particle.entities) {
+		// Retrieve the Motion component for each particle
+		Motion& motion = registry.motions.get(particleEntity);
+
+		// Fill instance data
+		positions.push_back(glm::vec3(motion.position, 0.0f)); // Assuming 2D, Z set to 0
+		scales.push_back(motion.scale);
+
+		// Retrieve color, if applicable, otherwise use a default
+		vec3 color = registry.colors.has(particleEntity) ? registry.colors.get(particleEntity) : vec3(1.0f, 1.0f, 1.0f);
+		colors.push_back(color);
+	}
+
+	// Create and bind instance VBOs
+	GLuint instanceVBO[3]; // For position, color, and scale
+	glGenBuffers(3, instanceVBO);
+
+	// Position VBO
+	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO[0]);
+	glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(glm::vec3), positions.data(), GL_DYNAMIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribDivisor(1, 1);
+
+	// Color VBO
+	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO[1]);
+	glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(glm::vec3), colors.data(), GL_DYNAMIC_DRAW);
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(2);
+	glVertexAttribDivisor(2, 1);
+
+	// Scale VBO
+	glBindBuffer(GL_ARRAY_BUFFER, instanceVBO[2]);
+	glBufferData(GL_ARRAY_BUFFER, scales.size() * sizeof(glm::vec2), scales.data(), GL_DYNAMIC_DRAW);
+	glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(3);
+	glVertexAttribDivisor(3, 1);
+
+	// Use the shader program
+	glUseProgram(effects[(GLuint)EFFECT_ASSET_ID::PARTICLE]);
+	gl_has_errors();
+
+	// Send uniform data
+	GLuint projection_loc = glGetUniformLocation(effects[(GLuint)EFFECT_ASSET_ID::PARTICLE], "projection");
+	glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float*)&projection);
+	gl_has_errors();
+
+	// Assuming all particles share the same geometry (e.g., a quad)
+	GLuint vbo = vertex_buffers[(GLuint)GEOMETRY_BUFFER_ID::PARTICLE];
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+
+	GLint size = 0;
+	glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+	GLsizei num_indices = size / sizeof(uint16_t);
+	// Draw all particles in one draw call
+	glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, 0, positions.size());
+	gl_has_errors();
+
+	// Cleanup
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glDeleteBuffers(3, instanceVBO); // Clean up instance VBOs after rendering
+}
 void RenderSystem::drawTexturedMesh(Entity entity,
-									const mat3 &projection, float elapsed_ms)
+	const mat3& projection, float elapsed_ms)
 {
-	Motion &motion = registry.motions.get(entity);
+	Motion& motion = registry.motions.get(entity);
 	// Transformation code, see Rendering and Transformation in the template
 	// specification for more info Incrementally updates transformation matrix,
 	// thus ORDER IS IMPORTANT
@@ -205,9 +277,9 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 
 	assert(registry.renderRequests.has(entity));
-	RenderRequest &render_request = registry.renderRequests.get(entity);
+	RenderRequest& render_request = registry.renderRequests.get(entity);
 	if (render_request.used_effect == EFFECT_ASSET_ID::SALMON) isSalmon = true;
-	if (render_request.used_effect == EFFECT_ASSET_ID::PEBBLE) isParticle = true;
+	if (render_request.used_effect == EFFECT_ASSET_ID::PARTICLE) isParticle = true;
 	const GLuint used_effect_enum = (GLuint)render_request.used_effect;
 	assert(used_effect_enum != (GLuint)EFFECT_ASSET_ID::EFFECT_COUNT);
 	const GLuint program = (GLuint)effects[used_effect_enum];
@@ -234,7 +306,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	{
 		isPortal = (registry.blocks.get(entity).type == 8);
 	}
-	
+
 	if (isNumber)
 	{
 		Number n = registry.number.get(entity);
@@ -268,10 +340,10 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 
 			updatePlayerAnimation(vbo, ibo, elapsed_ms, 200.f, player, GEOMETRY_BUFFER_ID::PLAYER_IDLE, SpriteSheetWidths::PLAYER_IDLE, player.idle_state, player.max_idle_state, false);
-			
+
 		}
-					
-		
+
+
 	}
 
 	if (isStar)
@@ -311,13 +383,13 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 
 		glEnableVertexAttribArray(in_position_loc);
 		glVertexAttribPointer(in_position_loc, 3, GL_FLOAT, GL_FALSE,
-							  sizeof(TexturedVertex), (void *)0);
+			sizeof(TexturedVertex), (void*)0);
 		gl_has_errors();
 
 		glEnableVertexAttribArray(in_texcoord_loc);
 		glVertexAttribPointer(
 			in_texcoord_loc, 2, GL_FLOAT, GL_FALSE, sizeof(TexturedVertex),
-			(void *)sizeof(
+			(void*)sizeof(
 				vec3)); // note the stride to skip the preceeding vertex position
 
 		// Enabling and binding texture to slot 0
@@ -347,7 +419,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 				texture_id =
 					texture_gl_handles[(GLuint)registry.renderRequests.get(entity).used_texture];
 			}
-		} 
+		}
 		else
 		{
 			texture_id =
@@ -384,7 +456,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 		glUniform1f(par_uloc, (float)(glfwGetTime() * 10.0f));
 
 		GLint light_up_uloc = glGetUniformLocation(program, "light_up");
-		const int lightup = registry.pebbleShells.has(entity) ? 1 : 0;
+		const int lightup = registry.lava.has(entity) ? 1 : 0;
 		glUniform1i(light_up_uloc, lightup);
 
 		GLint p_pos = glGetUniformLocation(program, "p_pos");
@@ -402,7 +474,7 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	// Getting uniform locations for glUniform* calls
 	GLint color_uloc = glGetUniformLocation(program, "fcolor");
 	const vec3 color = registry.colors.has(entity) ? registry.colors.get(entity) : vec3(1);
-	glUniform3fv(color_uloc, 1, (float *)&color);
+	glUniform3fv(color_uloc, 1, (float*)&color);
 	gl_has_errors();
 
 	// Get number of indices from index buffer, which has elements uint16_t
@@ -417,9 +489,9 @@ void RenderSystem::drawTexturedMesh(Entity entity,
 	glGetIntegerv(GL_CURRENT_PROGRAM, &currProgram);
 	// Setting uniform values to the currently bound program
 	GLuint transform_loc = glGetUniformLocation(currProgram, "transform");
-	glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float *)&transform.mat);
+	glUniformMatrix3fv(transform_loc, 1, GL_FALSE, (float*)&transform.mat);
 	GLuint projection_loc = glGetUniformLocation(currProgram, "projection");
-	glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float *)&projection);
+	glUniformMatrix3fv(projection_loc, 1, GL_FALSE, (float*)&projection);
 	gl_has_errors();
 	// Drawing of num_indices/3 triangles specified in the index buffer
 	glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_SHORT, nullptr);
@@ -514,7 +586,7 @@ void RenderSystem::draw(float elapsed_ms)
 	// Draw all textured meshes that have a position and size component
 	for (Entity entity : registry.renderRequests.entities)
 	{
-		if (!registry.motions.has(entity))
+		if (!registry.motions.has(entity)) //skip particles and entities without motion component
 			continue;
 		/*if (registry.background.has(entity))
 		{
@@ -527,6 +599,7 @@ void RenderSystem::draw(float elapsed_ms)
 		}
 		else
 		{*/
+		
 			drawTexturedMesh(entity, projection_2D, elapsed_ms);
 		//}
 

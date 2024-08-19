@@ -32,10 +32,10 @@ public:
 
 	void explode(Entity block, std::unordered_set<Entity, EntityHash>& explodedBlocks);
     void processExplosion(Entity block, Motion &player, vec3 colorStar);
-    void handleDigging(float elapsed_ms_since_last_update, bool hit, Motion &playerM, vec3 colorDirt, vec3 colorStar);
+    void handleDigging(float elapsed_ms_since_last_update, bool hit, Motion &playerM);
     // Steps the game ahead by ms milliseconds
 
-	std::vector<std::vector<std::vector<Entity>>> step(float elapsed_ms, int& flag);
+	std::vector<std::vector<std::vector<Entity>>> step(float elapsed_ms, bool& IsTutorial);
 	std::vector<std::vector<std::vector<Entity>>> grid;
 
 
@@ -66,7 +66,7 @@ private:
 	// Input callback functions
 	void on_key(int key, int, int action, int mod);
 	void on_mouse_move(vec2 pos);
-    void generateMap(std::vector<std::vector<int>> map);
+   
     void on_mouse_button(int button, int action, int mod);
     // restart level
 	void restart_game(GameStateChange gc = GameStateChange::PLAY);
@@ -74,10 +74,6 @@ private:
 
 	void setGrid(ComponentContainer<Motion> motions);
 
-	// Generate map
-	void generateRandomMap();
-	void generateRandomUIMap();
-	void generateTutorialMapDEMO();
 	void get_resolution();
 	
 	int mapState = 0;

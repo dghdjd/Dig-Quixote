@@ -74,7 +74,7 @@ class RenderSystem {
 	// Make sure these paths remain in sync with the associated enumerators.
 	const std::array<std::string, effect_count> effect_paths = {
 		shader_path("coloured"),
-		shader_path("pebble"),
+		shader_path("particle"),
 		shader_path("salmon"),
 		shader_path("textured"),
 		shader_path("water") };
@@ -125,6 +125,7 @@ public:
 
 private:
 	// Internal drawing functions for each entity type
+	void drawInstancedParticles(Entity entity, const mat3& projection, float elapsed_ms);
 	void drawTexturedMesh(Entity entity, const mat3& projection, float elapsed_ms);
 	void drawToScreen();
 	float time = 0.0f;

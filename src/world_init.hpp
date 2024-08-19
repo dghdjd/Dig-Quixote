@@ -5,6 +5,9 @@
 #include "render_system.hpp"
 
 // These are ahrd coded to the dimensions of the entity texture
+const int MAP_WIDTH = 20;
+const int MAP_HEIGHT = 20;
+
 const float BLOCK_BB_WIDTH = 100.f / 2;		// 0.4f * 296.f;
 const float BLOCK_BB_HEIGHT = 100.f / 2;		// 0.4f * 296.f;
 

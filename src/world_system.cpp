@@ -3,6 +3,7 @@
 #include "world_init.hpp"
 #include "render_system.hpp"
 #include "particle_system.hpp"
+#include "map.hpp"
 #include "SDL.h"
 #include "iostream"
 #include <chrono>
@@ -14,6 +15,7 @@
 #include "physics_system.hpp"
 #include "iostream"
 #include "unordered_set"
+#include <thread>
 
 // Game configuration
 const size_t MAX_TURTLES = 15;
@@ -22,8 +24,8 @@ const size_t TURTLE_DELAY_MS = 2000 * 3;
 const size_t FISH_DELAY_MS = 5000 * 3;
 vec2 mouse_pos = { 0.f, 0.f };
 bool game_over = false;
-const int MAP_WIDTH = 20;
-const int MAP_HEIGHT = 20;
+//const int MAP_WIDTH = 20;
+//const int MAP_HEIGHT = 20;
 
 std::vector<Entity> particles;
 
@@ -36,122 +38,7 @@ int WorldSystem::window_width;
 int WorldSystem::window_height;
 
 ParticleSystem particle_system;
-
-const std::vector<std::vector<int>> tr_map = {
-	{999, 999, 0, 0, 0, 0, 0, 0, 0, 999, 999, 0, 0, 0, 0, 0, 0, 0, 999, 999},
-	{0, 0, 0, 0, 999, 999, 0, 993, 0, 999, 999, 0, 992, 0, 999, 999, 0, 0, 0, 0},
-	{0, 0, 0, 0, 999, 999, 0, 0, 993, 0, 0, 992, 0, 0, 999, 999, 0, 0, 0, 0},
-	{0, 0, 0, 0, 0, 0, 0, 0, 994, 0, 0, 994, 0, 0, 0, 0, 0, 0, 0, 0},
-	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-};
-
-
-const std::vector<std::vector<int>> map_demo_1 = {
-	{9, 9, 9, 9, 9, 9, 9, 9, 9, 9},
-	{1, 0, 1, 0, 1, 1, 0, 6, 1, 0},
-	{0, 0, 1, 0, 6, 0, 1, 0, 0, 0},
-	{0, 1, 1, 0, 1, 0, 1, 0, 1, 0},
-	{1, 0, 1, 1, 1, 0, 0, 1, 0, 1},
-	{0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
-	{1, 0, 0, 1, 0, 1, 0, 1, 0, 1},
-	{1, 1, 0, 0, 1, 0, 0, 0, 0, 1},
-	{1, 0, 1, 0, 0, 1, 0, 1, 1, 1},
-	{0, 0, 0, 0, 1, 1, 0, 0, 0, 1},
-	{0, 1, 1, 1, 0, 1, 1, 1, 1, 0}
-};
-
-const std::vector<std::vector<int>> map_demo_2 = {
-	{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-	{1, 2, 2, 1, 2, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2, 1, 1},
-	{1, 1, 1, 1, 2, 6, 1, 2, 1, 2, 1, 1, 1, 1, 2, 6, 1, 1, 2, 1},
-	{1, 2, 2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 2, 1, 2, 1, 1, 2, 1, 2},
-	{2, 1, 2, 2, 1, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2, 2},
-	{2, 1, 1, 2, 1, 2, 2, 6, 1, 2, 1, 2, 1, 1, 2, 1, 2, 6, 1, 1},
-	{2, 1, 6, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1},
-	{1, 2, 1, 1, 2, 1, 1, 2, 2, 2, 2, 1, 1, 2, 1, 2, 1, 1, 2, 2},
-	{2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1},
-	{2, 1, 2, 1, 1, 2, 1, 2, 2, 6, 2, 2, 1, 1, 1, 1, 2, 2, 2, 1},
-	{2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 6, 2},
-	{1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 1, 2, 2},
-	{1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1},
-	{2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1},
-	{6, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 1, 2, 1, 1, 1, 1, 2, 1},
-	{2, 1, 2, 1, 1, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2},
-	{1, 2, 1, 1, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 1, 1, 2, 1, 1, 2},
-	{1, 2, 1, 1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 1, 2},
-	{2, 2, 2, 1, 2, 1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 2},
-	{1, 1, 2, 2, 2, 1, 2, 2, 2, 2, 1, 2, 1, 2, 2, 2, 2, 1, 2, 1}
-};
-
-const std::vector<std::vector<int>> map1 = {
-	{2, 2, 2, 8, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 2, 2},
-	{1, 2, 2, 1, 2, 2, 2, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 2, 1, 1},
-	{1, 1, 1, 1, 2, 6, 1, 2, 1, 2, 1, 1, 1, 1, 2, 6, 1, 1, 2, 1},
-	{1, 2, 2, 2, 1, 1, 1, 2, 2, 1, 2, 2, 2, 1, 2, 1, 1, 2, 1, 2},
-	{2, 1, 2, 2, 1, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 1, 2, 1, 2, 2},
-	{2, 1, 1, 2, 1, 2, 2, 6, 1, 2, 1, 2, 1, 1, 2, 1, 2, 6, 1, 1},
-	{2, 1, 6, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1},
-	{1, 2, 1, 1, 2, 1, 1, 2, 2, 2, 2, 1, 1, 2, 1, 2, 1, 1, 2, 2},
-	{2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1},
-	{2, 1, 2, 1, 1, 2, 1, 2, 2, 6, 2, 2, 1, 1, 1, 1, 2, 2, 2, 1},
-	{2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 6, 2},
-	{1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2},
-	{1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 0, 1, 1, 2, 2, 1, 1},
-	{2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1, 1, 2, 8, 1, 1, 1, 1, 1, 1},
-	{6, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 2, 1},
-	{2, 1, 2, 1, 1, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2},
-	{1, 2, 1, 1, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 2, 1, 2, 1, 1, 2},
-	{1, 2, 1, 1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 1, 2},
-	{2, 2, 2, 1, 2, 1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 2},
-	{3, 3, 2, 2, 2, 3, 2, 2, 2, 2, 3, 2, 3, 2, 2, 2, 2, 3, 2, 3}
-};
-
-
-const std::vector<std::vector<int>> map2 = {
-	{1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 8, 1, 2, 1},
-	{1, 2, 2, 2, 2, 2, 2, 6, 2, 2, 2, 1, 2, 2, 2, 1, 1, 1, 2, 1},
-	{1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 1, 2, 2, 2},
-	{1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 1},
-	{1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 2, 1, 2, 6, 2, 1, 2, 1, 2, 2},
-	{1, 1, 1, 1, 2, 1, 2, 6, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2, 2},
-	{1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 2, 1, 1, 2, 1, 2},
-	{1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1, 2, 2, 2, 1, 2, 2},
-	{1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 2, 2},
-	{1, 2, 2, 2, 1, 2, 1, 2, 2, 2, 1, 2, 2, 1, 1, 1, 6, 2, 2, 1},
-	{1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 6, 1, 1, 2, 1, 1},
-	{1, 2, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1},
-	{1, 2, 1, 2, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1},
-	{1, 2, 1, 2, 1, 1, 2, 2, 2, 2, 2, 1, 6, 1, 1, 2, 6, 1, 2, 1},
-	{1, 2, 1, 2, 1, 2, 6, 2, 2, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1},
-	{1, 1, 1, 2, 6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 6, 1},
-	{1, 1, 1, 2, 2, 1, 1, 8, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1},
-	{1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 6, 1, 1, 2, 2, 2, 1, 6, 1, 1},
-	{1, 2, 1, 1, 2, 6, 1, 1, 2, 2, 2, 2, 1, 2, 1, 1, 1, 1, 1, 1},
-	{3, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 3, 3, 3, 3, 3, 3}
-};
-
-const std::vector<std::vector<int>> map3 = {
-	{7, 7, 0, 0, 0, 2, 0, 0, 1, 1, 0, 7, 7, 7, 0, 0, 0, 0, 7, 0},
-	{7, 0, 0, 0, 0, 7, 7, 7, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	{0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 7, 1, 0, 7},
-	{0, 7, 1, 0, 0, 0, 0, 2, 7, 2, 0, 0, 2, 0, 2, 0, 0, 1, 0, 7},
-	{0, 2, 2, 0, 7, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 7},
-	{0, 0, 0, 0, 7, 7, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0, 2, 0, 7},
-	{7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 6, 0, 7},
-	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2, 7},
-	{0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7},
-	{7, 0, 2, 2, 2, 2, 2, 2, 2, 2, 7, 2, 2, 0, 2, 0, 0, 0, 2, 7},
-	{7, 0, 2, 6, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 7, 7, 0, 2, 1, 7},
-	{7, 0, 2, 2, 2, 2, 2, 0, 0, 0, 0, 2, 2, 2, 2, 2, 0, 0, 1, 7},
-	{7, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7},
-	{7, 0, 0, 6, 0, 7, 7, 7, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 7},
-	{7, 7, 0, 1, 2, 1, 1, 1, 7, 2, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7},
-	{7, 8, 0, 7, 7, 7, 7, 7, 7, 7, 7, 2, 0, 0, 0, 0, 7, 7, 7, 7},
-	{7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 2, 7, 0, 7, 7, 6, 6},
-	{7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 0},
-	{7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 8}
-};
+Map map;
 
 // Create the fish world
 WorldSystem::WorldSystem()
@@ -322,19 +209,6 @@ bool playAttackSoundEffect(int state)
 	return state == 3 || state == 7 || state == 11;
 }
 
-void createParticles11(const Motion& blockM)
-{
-	float offset = 2.f;
-	glm::vec2 newPosition = { blockM.position.x - blockM.scale.x / 2, blockM.position.y };
-	for (int i = 0; i < 5; i++)
-	{
-		Entity particle;
-		particle = createParticle(newPosition + i * offset * 2, { 3.5, 3.5 }, 0.f, i - 1);
-
-		registry.colors.insert(particle, vec3{ 0,1,1 });
-	}
-}
-
 void WorldSystem::processExplosion(Entity block, Motion& playerM, vec3 colorStar)
 {
 	Explosion exp = registry.explosions.get(block);
@@ -396,7 +270,7 @@ void WorldSystem::processExplosion(Entity block, Motion& playerM, vec3 colorStar
 
 }
 
-void WorldSystem::handleDigging(float elapsed_ms_since_last_update, bool hit, Motion& playerM, vec3 colorDirt, vec3 colorStar)
+void WorldSystem::handleDigging(float elapsed_ms_since_last_update, bool hit, Motion& playerM)
 {
 	auto& blocks = registry.blocks;
 	Entity* block_remove = nullptr;
@@ -436,25 +310,27 @@ void WorldSystem::handleDigging(float elapsed_ms_since_last_update, bool hit, Mo
 		holdTime += elapsed_ms_since_last_update;
 
 		if (hit && registry.explosions.has(*block_remove))  //explosive block
-			particle_system.CreateParticlesAtCollisionEdge(playerM, m_block, uniform_dist(rng), vec3(0, 1, 1));
+			particle_system.CreateParticlesAtCollisionEdge(playerM, m_block, uniform_dist(rng), particle_system.BlueParticles);
 		else if (mapState == 0)								//Tutorial map
-			particle_system.CreateParticlesAtCollisionEdge(playerM, m_block, uniform_dist(rng), vec3(1, 1, 1));
+			particle_system.CreateParticlesAtCollisionEdge(playerM, m_block, uniform_dist(rng), particle_system.WhiteParticles);
 		else if (hit)										//Normal Hit
-			particle_system.CreateParticlesAtCollisionEdge(playerM, m_block, uniform_dist(rng), colorDirt);
+			particle_system.CreateParticlesAtCollisionEdge(playerM, m_block, uniform_dist(rng), particle_system.BrownParticles);
 
 
 		if (holdTime >= requiredHoldTime) //remove block
 		{
 			if (registry.explosions.has(*block_remove))
 			{
-				processExplosion(*block_remove, playerM, colorStar);
+				processExplosion(*block_remove, playerM, vec3(0, 1, 1));
 			}
 			if (b_block->type == 6)
 				b_block->explode = true;
 			else
 				registry.remove_all_components_of(*block_remove);
 
-			particle_system.CreateParticlesWhenBroken(m_block, colorDirt);
+
+			if(mapState != 0)
+			particle_system.CreateParticlesWhenBroken(m_block, particle_system.BrownParticles);
 
 			holdTime = 0.f;
 
@@ -477,13 +353,6 @@ void WorldSystem::handleDigging(float elapsed_ms_since_last_update, bool hit, Mo
 	}
 }
 
-void activateParticle() {
-	for (auto& particle : particles) {
-		Motion& m = registry.motions.get(particle);
-		m.isActive = true; // Activate the particle
-	}
-}
-
 void WorldSystem::setGrid(ComponentContainer<Motion> motions)
 {
 
@@ -499,10 +368,10 @@ void WorldSystem::setGrid(ComponentContainer<Motion> motions)
 		row.resize(cellsPerRow);
 	}
 
-	if (mapState == 0)
-	{
-		return;
-	}
+	//if (mapState == 0)
+	//{
+	//	return;
+	//}
 
 	for (int i = 0; i < motions.size(); i++)
 	{
@@ -519,7 +388,7 @@ void WorldSystem::setGrid(ComponentContainer<Motion> motions)
 }
 
 // Update our game world
-std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms_since_last_update, int& flag)
+std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms_since_last_update, bool& IsTutorial)
 {
 
 	// std::cout << "TIME!!!!!: " << time << std::endl;
@@ -534,17 +403,17 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 
 	// Removing out of screen entities
 	auto& motion_container = registry.motions;
-	auto& physics_container = registry.physics;
-	for (int i = (int)physics_container.components.size() - 1; i >= 0; --i)
+	auto& particle_container = registry.particle;
+	for (int i = (int)particle_container.components.size() - 1; i >= 0; --i)
 	{
-		Physics& physics = physics_container.components[i];
-		Entity e = physics_container.entities[i];
-		if (registry.pebbleShells.has(e)) continue;
-		physics.timer -= elapsed_ms_since_last_update;
-		if (physics.timer < 0.f)
+		Particle& particleSystem = particle_container.components[i];
+		Entity e = particle_container.entities[i];
+		if (registry.lava.has(e)) continue;
+		particleSystem.timer -= elapsed_ms_since_last_update;
+		if (particleSystem.timer < 0.f)
 		{
 			registry.motions.remove(e);
-			registry.physics.remove(e);
+			registry.particle.remove(e);
 		}
 	}
 
@@ -556,7 +425,7 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 		{
 			for (uint i = 0; i < b_exp.size(); i++)
 			{
-				createParticles11(registry.motions.get(b_exp[i]));
+				particle_system.CreateParticlesWhenBroken(registry.motions.get(b_exp[i]), vec3(0, 1, 1));
 				registry.remove_all_components_of(b_exp[i]);
 			}
 			b_exp.clear();
@@ -586,8 +455,6 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 	// Processing the salmon state
 	Player& player1 = registry.players.get(PLAYER);
 	Motion& playerM = registry.motions.get(PLAYER);
-	vec3 colorDirt = { 139.0 / 255.0, 69.0 / 255.0, 19.0 / 255.0 };
-	vec3 colorStar = { 1.0, 1.0, 0.f };
 	time += elapsed_ms_since_last_update;
 
 	// check for the explosive blocks
@@ -608,7 +475,7 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 	if (isLeftMouseButtonPressed)
 	{
 		// dig
-		handleDigging(elapsed_ms_since_last_update, hit, playerM, colorDirt, colorStar);
+		handleDigging(elapsed_ms_since_last_update, hit, playerM);
 	}
 
 
@@ -639,7 +506,12 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 		}
 	}
 
+
+	if (map.map_created) 
 	setGrid(motion_container);
+
+
+
 	float min_timer_ms = 3000.f;
 	for (Entity entity : registry.deathTimers.entities)
 	{
@@ -663,7 +535,7 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 	// reduce window brightness if any of the present salmons is dying
 	screen.screen_darken_factor = 1 - min_timer_ms / 3000;
 
-	flag = mapState;
+	mapState == 0 ? IsTutorial = true : IsTutorial = false;
 	return grid;
 
 }
@@ -763,35 +635,27 @@ void WorldSystem::restart_game(GameStateChange sc)
 		// Map control
 		if (mapState == 0)
 		{
-			generateTutorialMapDEMO();
+			map.generateTutorialMapDEMO(window_width, window_height, renderer);
 			number = createNumbers(20, window_width, window_height);
 		}
 		else if (mapState == 1)
 		{
-			generateMap(map1);
+			map.generateMap(map1, window_width, renderer);
 			number = createNumbers(25, window_width, window_height);
 		}
 		else if (mapState == 2)
 		{
 
-			generateMap(map2);
+			map.generateMap(map2, window_width, renderer);
 			number = createNumbers(50, window_width, window_height);
 		}
 		else if (mapState == 3)
 		{
-			generateMap(map3);
+			map.generateMap(map3, window_width, renderer);
 			number = createNumbers(50, window_width, window_height);
 
 		}
 
-		/*std::random_device rd;
-		std::mt19937 gen(rd());
-
-		std::uniform_int_distribution<int> distribution(1, 3);
-
-		std::uniform_int_distribution<int> color_d(1, 10);
-
-		int random_map = distribution(gen);*/
 
 		tutorial = createTuButton(renderer, { 75.f, 75.f });
 		start = createEmptySuButton();
@@ -895,7 +759,7 @@ void WorldSystem::handle_collisions()
 					}
 				}
 			}
-			if (registry.pebbleShells.has(entity_other))
+			if (registry.lava.has(entity_other))
 			{
 
 				if (!registry.deathTimers.has(entity)) {
@@ -1012,7 +876,7 @@ void WorldSystem::on_key(int key, int, int action, int mod)
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_P)
 	{
-		activateParticle();
+		particle_system.ActivateParticle();
 	}
 
 
@@ -1109,225 +973,6 @@ int WorldSystem::get_window_height()
 {
 	return window_height;
 }
-
-void WorldSystem::generateMap(std::vector<std::vector<int>> map)
-{
-
-	for (int i = 0; i < map.size(); i++)
-	{
-		float ypos = 150.f + BLOCK_BB_HEIGHT * i;
-		for (int j = 0; j < map[i].size(); j++)
-		{
-
-			if (map[i][j] != 0) {
-
-				float xpos = window_width / 2 - BLOCK_BB_WIDTH * (MAP_WIDTH / 2) + BLOCK_BB_WIDTH / 2 + BLOCK_BB_WIDTH * j;
-				Entity entity = createBlock(renderer, { xpos, ypos }, map[i][j]);
-			}
-
-		}
-	}
-}
-
-void  WorldSystem::generateTutorialMapDEMO()
-{
-	float ypos = window_height / 2 - BLOCK_BB_HEIGHT / 2;
-	float xpos = window_width / 2 - BLOCK_BB_WIDTH * 9;
-	Entity entity = createBlock(renderer, { xpos, ypos }, 999);
-
-	xpos = window_width / 2 + 9 * BLOCK_BB_WIDTH;
-	entity = createBlock(renderer, { xpos, ypos }, 999);
-
-	ypos = window_height / 2 + BLOCK_BB_HEIGHT - BLOCK_BB_HEIGHT / 2;
-	xpos = window_width / 2;
-	entity = createBlock(renderer, { xpos, ypos }, 998);
-
-	ypos = window_height / 2 + BLOCK_BB_HEIGHT * 2 - BLOCK_BB_HEIGHT / 2;
-	xpos = window_width / 2 - BLOCK_BB_HEIGHT * 5;
-	entity = createBlock(renderer, { xpos, ypos }, 996);
-
-	xpos = window_width / 2 + BLOCK_BB_HEIGHT * 5;
-	entity = createBlock(renderer, { xpos, ypos }, 997);
-
-	for (int i = 0; i < tr_map.size(); i++)
-	{
-		float ypos = window_height / 2 + BLOCK_BB_HEIGHT * i;
-		for (int j = 0; j < tr_map[i].size(); j++)
-		{
-			if (tr_map[i][j] != 999)
-			{
-				if (tr_map[i][j] == 994)
-				{
-					float xpos = window_width / 2 - BLOCK_BB_WIDTH * (MAP_WIDTH / 2) + BLOCK_BB_WIDTH / 2 + BLOCK_BB_WIDTH * j;
-					Entity entity = createBlock(renderer, { xpos, ypos }, 994);
-				}
-				else if (tr_map[i][j] == 993)
-				{
-					float xpos = window_width / 2 - BLOCK_BB_WIDTH * (MAP_WIDTH / 2) + BLOCK_BB_WIDTH / 2 + BLOCK_BB_WIDTH * j;
-					Entity entity = createBlock(renderer, { xpos, ypos }, 993);
-				}
-				else if (tr_map[i][j] == 992)
-				{
-					float xpos = window_width / 2 - BLOCK_BB_WIDTH * (MAP_WIDTH / 2) + BLOCK_BB_WIDTH / 2 + BLOCK_BB_WIDTH * j;
-					Entity entity = createBlock(renderer, { xpos, ypos }, 992);
-				}
-				else {
-					float xpos = window_width / 2 - BLOCK_BB_WIDTH * (MAP_WIDTH / 2) + BLOCK_BB_WIDTH / 2 + BLOCK_BB_WIDTH * j;
-					Entity entity = createBlock(renderer, { xpos, ypos }, 995);
-				}
-			}
-		}
-	}
-}
-
-bool dfs(const std::vector<std::vector<int>>& map, std::vector<std::vector<bool>>& visited, int x, int y)
-{
-	if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT || map[y][x] == 1 || visited[y][x])
-		return false;
-	visited[y][x] = true;
-	if (y == MAP_HEIGHT - 1)
-		return true;
-	return dfs(map, visited, x + 1, y) ||
-		dfs(map, visited, x - 1, y) ||
-		dfs(map, visited, x, y + 1) ||
-		dfs(map, visited, x, y - 1);
-}
-
-bool hasPathFromTopToBottom(const std::vector<std::vector<int>>& map)
-{
-	std::vector<std::vector<bool>> visited(MAP_HEIGHT, std::vector<bool>(MAP_WIDTH, false));
-
-	for (int i = 0; i < MAP_WIDTH; i++)
-	{
-		if (dfs(map, visited, i, 0))
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-void WorldSystem::generateRandomMap()
-{
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_int_distribution<int> distribution(0, 9);
-
-	std::vector<std::vector<int>> map(MAP_HEIGHT, std::vector<int>(MAP_WIDTH));
-	bool pathExists = true;
-
-	if (pathExists)
-	{
-		for (int y = 0; y < MAP_HEIGHT; y++)
-		{
-			for (int x = 0; x < MAP_WIDTH; x++)
-			{
-				if (y == 0)
-				{
-					map[y][x] = 0;
-				}
-				else
-				{
-					float val = distribution(gen);
-					if (val <= 4)
-					{
-						map[y][x] = 1;
-					}
-					else
-					{
-						if (val <= 8)
-						{
-							map[y][x] = 0;
-						}
-						else
-						{
-							map[y][x] = 6;
-						}
-					}
-				}
-			}
-		}
-
-		if (hasPathFromTopToBottom(map))
-		{
-			pathExists = true;
-		}
-	}
-	bool flag = false;
-	for (int y = 0; y < MAP_HEIGHT; y++)
-	{
-		for (int x = 0; x < MAP_WIDTH; x++)
-		{
-			if (y == MAP_HEIGHT - 1) flag = true;
-			float ypos = 150.f + BLOCK_BB_HEIGHT * y;
-			float xpos = 250.f + BLOCK_BB_WIDTH * x;
-			Entity entity = createBlock(renderer, { xpos, ypos }, map[y][x]);
-
-		}
-	}
-}
-
-void WorldSystem::generateRandomUIMap() {
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_int_distribution<int> distribution(0, 9);
-
-	std::vector<std::vector<int>> map(MAP_HEIGHT, std::vector<int>(6));
-
-	for (int y = 0; y < MAP_HEIGHT; y++)
-	{
-		for (int x = 0; x < 6; x++)
-		{
-			if (y == 0)
-			{
-				map[y][x] = 0;
-			}
-			else
-			{
-				float val = distribution(gen);
-				if (val <= 4)
-				{
-					map[y][x] = 1;
-				}
-				else
-				{
-					if (val <= 8)
-					{
-						map[y][x] = 0;
-					}
-					else
-					{
-						map[y][x] = 6;
-					}
-				}
-			}
-		}
-	}
-
-	for (int y = 0; y < MAP_HEIGHT; y++)
-	{
-		for (int x = 0; x < 3; x++)
-		{
-			float ypos = 150.f + BLOCK_BB_HEIGHT * y;
-			float xpos = 400.f + BLOCK_BB_WIDTH * x;
-			Entity entity = createBlock(renderer, { xpos, ypos }, map[y][x]);
-
-		}
-	}
-
-	for (int y = 0; y < MAP_HEIGHT; y++)
-	{
-		for (int x = 3; x < 6; x++)
-		{
-			float ypos = 150.f + BLOCK_BB_HEIGHT * y;
-			float xpos = 1250.f + BLOCK_BB_WIDTH * x;
-			Entity entity = createBlock(renderer, { xpos, ypos }, map[y][x]);
-
-		}
-	}
-
-}
-
 
 void WorldSystem::window2()
 {

@@ -375,7 +375,7 @@ Entity createLine(vec2 position, vec2 scale)
 	registry.renderRequests.insert(
 		entity,
 		{TEXTURE_ASSET_ID::TEXTURE_COUNT,
-		 EFFECT_ASSET_ID::PEBBLE,
+		 EFFECT_ASSET_ID::PARTICLE,
 		 GEOMETRY_BUFFER_ID::DEBUG_LINE});
 
 	// Create motion
@@ -392,9 +392,9 @@ Entity createLine(vec2 position, vec2 scale)
 Entity createParticle(vec2 pos, vec2 size, float angle, float random)
 {
 	auto entity = Entity();
-	registry.physics.emplace(entity);
-	Physics& physics = registry.physics.get(entity);
-	float gravity = physics.gravity;
+	registry.particle.emplace(entity);
+	Particle& particleSystem = registry.particle.get(entity);
+	float gravity = particleSystem.gravity;
 
 	float bubble_speed = 5.f;
 	float bubble_angle = (random / 2) * (M_PI / 4); // [-pi/4, pi/4] 
@@ -416,11 +416,11 @@ Entity createParticle(vec2 pos, vec2 size, float angle, float random)
 
 	// Create and (empty) Salmon component to be able to refer to all turtles
 	//registry.hardShells.emplace(entity);
-	registry.renderRequests.insert(
-		entity,
-		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no txture is needed
-			EFFECT_ASSET_ID::PEBBLE,
-			GEOMETRY_BUFFER_ID::PEBBLE });
+	//registry.renderRequests.insert(
+	//	entity,
+	//	{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no txture is needed
+	//		EFFECT_ASSET_ID::PARTICLE,
+	//		GEOMETRY_BUFFER_ID::PARTICLE });
 
 	return entity;
 }
@@ -428,10 +428,10 @@ Entity createParticle(vec2 pos, vec2 size, float angle, float random)
 Entity createLavaParticles(vec2 pos, vec2 size, float angle, float random)
 {
 	auto entity = Entity();
-	registry.physics.emplace(entity);
-	registry.pebbleShells.emplace(entity);
-	Physics& physics = registry.physics.get(entity);
-	float gravity = physics.gravity;
+	registry.particle.emplace(entity);
+	registry.lava.emplace(entity);
+	Particle& particleSystem = registry.particle.get(entity);
+	float gravity = particleSystem.gravity;
 
 	float bubble_speed = 5.f;
 	float bubble_angle = (1 / 2) * (M_PI / 4); // [-pi/4, pi/4] 
@@ -460,8 +460,8 @@ Entity createLavaParticles(vec2 pos, vec2 size, float angle, float random)
 	registry.renderRequests.insert(
 		entity,
 		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no txture is needed
-			EFFECT_ASSET_ID::PEBBLE,
-			GEOMETRY_BUFFER_ID::PEBBLE });
+			EFFECT_ASSET_ID::PARTICLE,
+			GEOMETRY_BUFFER_ID::PARTICLE });
 
 	return entity;
 }

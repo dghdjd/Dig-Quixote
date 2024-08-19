@@ -70,10 +70,6 @@ struct Explosion1
 
 };
 
-struct Lava
-{
-
-};
 
 struct EntityHash {
     std::size_t operator()(const Entity& entity) const {
@@ -113,14 +109,14 @@ struct Gravity {
     float acceleration_y;
 	bool moveable_down;
 };
-struct Physics
+struct Particle
 {
 	float gravity = 98.f / 2.f;
 	float timer = 3000.f;
 	bool collision = false;
 
 };
-struct PebbleShell
+struct Lava
 {
 	bool ifHit = false;
 };
@@ -291,8 +287,8 @@ const int texture_count = (int)TEXTURE_ASSET_ID::TEXTURE_COUNT;
 
 enum class EFFECT_ASSET_ID {
 	COLOURED = 0,
-	PEBBLE = COLOURED + 1,
-	SALMON = PEBBLE + 1,
+	PARTICLE = COLOURED + 1,
+	SALMON = PARTICLE + 1,
 	TEXTURED = SALMON + 1,
 	WATER = TEXTURED + 1,
 	EFFECT_COUNT = WATER + 1
@@ -306,8 +302,8 @@ enum class GEOMETRY_BUFFER_ID {
 	PLAYER_RUN       = PLAYER_IDLE + 1,
 	PLAYER_JUMP      = PLAYER_RUN + 1,
 	PLAYER_ATTACK    = PLAYER_JUMP + 1,
-	PEBBLE           = PLAYER_ATTACK + 1,
-	DEBUG_LINE       = PEBBLE + 1,
+	PARTICLE           = PLAYER_ATTACK + 1,
+	DEBUG_LINE       = PARTICLE + 1,
 	SCREEN_TRIANGLE  = DEBUG_LINE + 1,
 	MESH_BLOCK       = SCREEN_TRIANGLE + 1,
 	WATER            = MESH_BLOCK + 1,
