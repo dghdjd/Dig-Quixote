@@ -27,11 +27,11 @@ bool game_over = false;
 //const int MAP_WIDTH = 20;
 //const int MAP_HEIGHT = 20;
 
-std::vector<Entity> particles;
+std::vector<Entity> LavaParticles;
 
 std::vector<Entity> b_exp;
 std::vector<Entity> delayedExplosions;
-bool flag11 = false;
+bool HasExpoldingBlocks = false;
 
 
 int WorldSystem::window_width;
@@ -263,7 +263,7 @@ void WorldSystem::processExplosion(Entity block, Motion& playerM, vec3 colorStar
 	//registry.remove_all_components_of(block);
 	b_exp.push_back(block);
 	registry.explosions1.emplace(block);
-	flag11 = true;
+	HasExpoldingBlocks = true;
 	RenderRequest& render_request = registry.renderRequests.get(block);
 	render_request.used_texture = TEXTURE_ASSET_ID::LIGHTING;
 	render_request.used_geometry = GEOMETRY_BUFFER_ID::LIGHTING;
@@ -418,7 +418,7 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 	}
 
 
-	if (flag11)
+	if (HasExpoldingBlocks)
 	{
 		int num = registry.blocks.get(b_exp[0]).state;
 		if (registry.blocks.get(b_exp[0]).exploded)
@@ -429,7 +429,7 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 				registry.remove_all_components_of(b_exp[i]);
 			}
 			b_exp.clear();
-			flag11 = false;
+			HasExpoldingBlocks = false;
 
 		}
 	}
@@ -452,7 +452,7 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 
 
 
-	// Processing the salmon state
+	// Processing the player state
 	Player& player1 = registry.players.get(PLAYER);
 	Motion& playerM = registry.motions.get(PLAYER);
 	time += elapsed_ms_since_last_update;
@@ -614,21 +614,21 @@ void WorldSystem::restart_game(GameStateChange sc)
 
 		//////////////////////////////////////////////////////////////
 		
-		//std::vector<Entity> p;
-		//float pSize = 3.5 * 2;
-		//vec2 pos = { 800.f, -pSize };
-		//for (int i = 0; i < 100; i++)
-		//{
-		//	pos.y -= pSize;
-		//	pos.x = 800.f;
-		//	for (int j = 0; j < 2; j++)
-		//	{
-		//		pos.x += pSize;
-		//		p.push_back(createLavaParticles(pos, { 3.5,3.5 }, 0.0, 0.0));
-		//	}
+		std::vector<Entity> p;
+		float pSize = 3.5 * 2;
+		vec2 pos = { 800.f, -pSize };
+		for (int i = 0; i < 200; i++)
+		{
+			pos.y -= pSize;
+			pos.x = 800.f;
+			for (int j = 0; j < 2; j++)
+			{
+				pos.x += pSize;
+				p.push_back(createLavaParticles(pos, { 2,2 }, 0.0, 0.0));
+			}
 
-		//}
-		//particles = p;
+		}
+		LavaParticles = p;
 
 		/////////////////////////////////////////////////////////////
 
@@ -876,7 +876,7 @@ void WorldSystem::on_key(int key, int, int action, int mod)
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_P)
 	{
-		particle_system.ActivateParticle();
+		particle_system.ActivateParticle(LavaParticles);
 	}
 
 

@@ -5,22 +5,24 @@
 #include "iostream"
 #include <chrono>
 #include <thread>
+#include <atomic>
+#include <mutex>
 // Returns the local bounding coordinates scaled by the current size of the entity
-vec2 get_bounding_box(const Motion &motion)
+vec2 get_bounding_box(const Motion& motion)
 {
 	// abs is to avoid negative scale due to the facing direction.
-	return {abs(motion.scale.x), abs(motion.scale.y)};
+	return { abs(motion.scale.x), abs(motion.scale.y) };
 }
 
-bool PhysicsSystem::collides_pos(const vec2 pos, const Motion &motion2)
+bool PhysicsSystem::collides_pos(const vec2 pos, const Motion& motion2)
 {
 	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
 	vec2 max2 = motion2.position + get_bounding_box(motion2) / 2.f;
 
 	return pos.x <= max2.x &&
-		   pos.x >= min2.x &&
-		   pos.y <= max2.y &&
-		   pos.y >= min2.y;
+		pos.x >= min2.x &&
+		pos.y <= max2.y &&
+		pos.y >= min2.y;
 }
 bool PhysicsSystem::collidesVertically(const Motion& motion1, const Motion& motion2) {
 	if (motion1.position.x != motion2.position.x) return false;
@@ -35,13 +37,13 @@ bool PhysicsSystem::collidesVertically(const Motion& motion1, const Motion& moti
 	return isColliding;
 }
 
-bool PhysicsSystem::collides(const Motion &motion1, const Motion &motion2)
-{	
+bool PhysicsSystem::collides(const Motion& motion1, const Motion& motion2)
+{
 
 	vec2 fur_pos = motion1.position + motion1.velocity / 1000.f;
 	// motion1's position is the center of the circle
 	vec2 circle_center = fur_pos;
-	float circle_radius = (get_bounding_box(motion1).x) / 2.f ; // Assuming x is width of the bounding box
+	float circle_radius = (get_bounding_box(motion1).x) / 2.f; // Assuming x is width of the bounding box
 
 	// Calculate AABB for motion2
 	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
@@ -152,14 +154,14 @@ void calculate_new_velocity_lava(Motion& motion1, bool ifhit)
 	motion1.velocity.y = -motion1.velocity.y * 0.3;
 }
 
-bool PhysicsSystem::point_in_circle(const vec2 &point, const vec2 &circle_center, float circle_radius)
+bool PhysicsSystem::point_in_circle(const vec2& point, const vec2& circle_center, float circle_radius)
 {
 	float dx = point.x - circle_center.x;
 	float dy = point.y - circle_center.y;
 	return dx * dx + dy * dy <= circle_radius * circle_radius;
 }
 
-bool PhysicsSystem::edge_intersects_circle(const vec2 &edge_start, const vec2 &edge_end, const vec2 &circle_center, float circle_radius)
+bool PhysicsSystem::edge_intersects_circle(const vec2& edge_start, const vec2& edge_end, const vec2& circle_center, float circle_radius)
 {
 	vec2 edge = edge_end - edge_start;
 	vec2 circle_to_start = edge_start - circle_center;
@@ -176,13 +178,13 @@ bool PhysicsSystem::edge_intersects_circle(const vec2 &edge_start, const vec2 &e
 	return point_in_circle(closest_point, circle_center, circle_radius);
 }
 
-bool PhysicsSystem::collides_with_polygon(const Motion &motion1, const std::vector<vec2> &vertices)
+bool PhysicsSystem::collides_with_polygon(const Motion& motion1, const std::vector<vec2>& vertices)
 {
 	vec2 circle_center = motion1.position;
 	float circle_radius = get_bounding_box(motion1).x / 2.f;
 
 	// Check if any vertex of the polygon is inside the circle
-	for (const vec2 &vertex : vertices)
+	for (const vec2& vertex : vertices)
 	{
 		if (point_in_circle(vertex, circle_center, circle_radius))
 		{
@@ -245,12 +247,12 @@ float lerp(float current, float goal, float delta)
 
 vec2 getMaxMinVertices(Entity entity)
 {
-	Mesh *mesh = registry.meshPtrs.get(entity);
+	Mesh* mesh = registry.meshPtrs.get(entity);
 	std::vector<ColoredVertex> vectices1 = mesh->vertices;
 	vec2 minVertex = vec2(0.f, 0.f);
 	vec2 maxVertex = vec2(0.f, 0.f);
 
-	for (const ColoredVertex &vertex : vectices1)
+	for (const ColoredVertex& vertex : vectices1)
 	{
 		minVertex.x = std::min(minVertex.x, vertex.position.x);
 		minVertex.y = std::min(minVertex.y, vertex.position.y);
@@ -340,14 +342,14 @@ void PhysicsSystem::handleParticleCollision()
 
 			physics.gravity = 0.f;
 			physics.collision = true;
-			
+
 		}
 		if (registry.particle.has(entity) && registry.players.has(entity_other))
 		{
 			Motion& p_motion = registry.motions.get(entity_other);
 			Motion& par_motion = registry.motions.get(entity);
 			par_motion.velocity.x += p_motion.velocity.x * 100.f;
-			
+
 		}
 	}
 	registry.particleCollisions.clear();
@@ -371,35 +373,364 @@ vec2 PhysicsSystem::checkBoundaryPlayer(const Motion& motion, Player& player) {
 
 
 
-//void parallelCollisionDetection(std::vector<std::vector<std::vector<Entity>>> grid) {
-//	int numThreads = std::thread::hardware_concurrency();
-//	std::vector<std::thread> threads;
-//
-//	int gridHeight = grid.size();
-//	int rowsPerThread = gridHeight / numThreads;
-//
-//	for (int i = 0; i < numThreads; ++i) {
-//		int startY = i * rowsPerThread;
-//		int endY = (i == numThreads - 1) ? gridHeight : startY + rowsPerThread;
-//		threads.emplace_back(checkCollisionsInChunk, startY, endY, 0, grid[0].size(), std::ref(grid));
-//	}
-//
-//	for (auto& thread : threads) {
-//		thread.join();  // Wait for all threads to finish
-//	}
+
+
+void PhysicsSystem::checkCollisionInChunks(std::vector<std::vector<std::vector<Entity>>>& grid, int y, int x, bool IsTutorial, vec2 boundary)
+{
+	//for (int y = 0; y < grid.size(); y++) {      // Iterate over rows
+		//for (int x = 0; x < grid.size(); x++) {  // Iterate over columns in each row
+			// Access the cell at (x, y)
+	std::vector<Entity>& cell = grid[y][x];
+
+	for (int i = 0; i < cell.size(); i++)
+	{
+
+		if (!registry.motions.has(cell[i])) continue;
+		Entity& entity_i = cell[i];
+		Motion& motion_i = registry.motions.get(cell[i]);
+		bool is_playeri = registry.players.has(cell[i]);
+		bool is_blocki = registry.blocks.has(cell[i]);
+		bool is_rock1 = registry.gravities.has(cell[i]);
+		bool is_particlei = registry.particle.has(cell[i]);
+		bool is_lavai = registry.lava.has(cell[i]);
+
+		for (int j = 0; j < cell.size(); j++)
+		{
+			if (!registry.motions.has(cell[j]) || i == j) continue;
+			Motion& motion_j = registry.motions.get(cell[j]);
+			Entity& entity_j = cell[j];
+			bool is_blockj = registry.blocks.has(cell[j]);
+			bool is_particlej = registry.particle.has(cell[j]);
+			bool is_lavaj = registry.lava.has(cell[j]);
+			if ((is_playeri && is_blockj))   //checking player
+			{
+
+				if (collides(motion_i, motion_j))
+				{
+					vec2 delta = motion_i.position - motion_j.position;
+					if (abs(delta.x) < abs(delta.y))
+					{
+						if (delta.y <= 0)
+						{
+							motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
+
+						}
+
+					}
+
+					registry.collisions.emplace_with_duplicates(entity_i, entity_j);
+
+				}
+			}
+			else if (is_playeri && is_lavaj)
+			{
+				if (collides(motion_i, motion_j))
+					registry.collisions.emplace_with_duplicates(entity_i, entity_j);
+			}
+			else if (is_blocki && is_blockj)  //checking rocks
+			{
+				bool isRock = registry.gravities.has(cell[i]) == 1;
+				bool collided = false;
+				if (isRock)
+				{
+					Gravity& g = registry.gravities.get(cell[i]);
+					g.moveable_down = true;
+					if (collidesVertically(motion_i, motion_j))
+					{
+						vec2 delta = motion_i.position - motion_j.position;
+						if (abs(delta.x) < abs(delta.y))
+						{
+							if (delta.y <= 0)
+							{
+								motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
+
+							}
+
+						}
+						g.moveable_down = false;
+						break;
+
+					}
+
+
+				}
+			}
+			else if (is_particlei)
+			{
+				Particle& physics = registry.particle.get(cell[i]);
+				//Motion& motion1 = registry.motions.get(cell[i]);
+				//Motion& motion2 = registry.motions.get(cell[j]);
+				physics.collision = false;
+				if (is_particlej)  // particle collision
+				{
+					if (!registry.lava.has(entity_i) && !registry.lava.has(entity_j))
+					{
+						if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
+						{
+							calculate_new_velocity1(motion_i, motion_j, false);
+							continue;
+						}
+					}
+
+
+				}
+				if (is_blockj && !IsTutorial) //skip particle collision in tutorial
+				{
+					if (particles_blocks_collide(motion_i, motion_j))
+					{
+						if (is_lavai)
+						{
+							Lava& p = registry.lava.get(cell[i]);
+							bool horizontal = isHorizontal(motion_i, motion_j);
+							if (!horizontal)
+							{
+								calculate_new_velocity_lava(motion_i, p.ifHit);
+								p.ifHit = true;
+							}
+							if (horizontal)
+							{
+								motion_i.velocity.x *= -1;
+							}
+
+						}
+						else
+						{
+							motion_i.velocity.y = 0.f;
+							motion_i.velocity.x = 0.f;
+
+						}
+
+						physics.gravity = 0.f;
+						physics.collision = true;
+						vec2 delta = motion_i.position - motion_j.position;
+						if (abs(delta.x) < abs(delta.y))
+						{
+							if (delta.y <= 0)
+							{
+								motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
+
+							}
+
+						}
+					}
+
+				}
+
+
+
+				if (motion_i.position.x - motion_i.scale.x <= boundary.x || motion_i.position.x + motion_i.scale.x >= boundary.y)
+					motion_i.velocity.x *= -1;
+			}
+		}
+
+
+		if (is_rock1)
+		{
+			Gravity& g = registry.gravities.get(cell[i]);
+			if (g.moveable_down == true)
+			{
+				// Check the cell that is one unit down
+				int belowY = y + 1;
+				if (belowY < grid.size()) {  // Ensure we are within grid bounds
+					std::vector<Entity>& belowCell = grid[belowY][x];
+					for (Entity& entity_below : belowCell) {
+						Motion& motion_below = registry.motions.get(entity_below);
+
+						if (collidesVertically(motion_i, motion_below)) {
+
+							vec2 delta = motion_i.position - motion_below.position;
+							if (abs(delta.x) < abs(delta.y)) {
+								if (delta.y <= 0) {
+									motion_i.position.y = motion_below.position.y - motion_below.scale.y / 2 - motion_i.scale.y / 2;
+								}
+							}
+							g.moveable_down = false;
+							break;
+							//registry.collisions.emplace_with_duplicates(entity_i, entity_below);
+						}
+					}
+				}
+			}
+
+
+		}
+		else
+		{
+
+			auto start1 = std::chrono::high_resolution_clock::now();
+
+			// Check collisions with adjacent cells
+			for (int adjY = y - 1; adjY <= y + 1; adjY++) {
+				for (int adjX = x - 1; adjX <= x + 1; adjX++) {
+					// Ensure we are within grid bounds and not checking the current cell
+					if (adjX >= 0 && adjX < grid.size() && adjY >= 0 && adjY < grid.size() && (adjX != x || adjY != y)) {
+						std::vector<Entity>& adjacentCell = grid[adjY][adjX];
+
+						for (int k = 0; k < adjacentCell.size(); k++) {
+							Motion& motion_j = registry.motions.get(adjacentCell[k]);
+							Entity& entity_j = adjacentCell[k];
+							bool is_blockj = registry.blocks.has(adjacentCell[k]);
+							bool is_particlej = registry.particle.has(adjacentCell[k]);
+							bool is_lavaj = registry.lava.has(adjacentCell[k]);
+
+
+							if (is_playeri && is_blockj) {
+								if (collides(motion_i, motion_j)) {
+									vec2 delta = motion_i.position - motion_j.position;
+									if (abs(delta.x) < abs(delta.y))
+									{
+										if (delta.y <= 0)
+										{
+											motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
+
+										}
+
+									}
+
+									registry.collisions.emplace_with_duplicates(entity_i, entity_j);
+								}
+							}
+							else if (is_particlei)
+							{
+								if (is_particlej)
+								{
+									if (!registry.lava.has(entity_i) && !registry.lava.has(entity_j))
+									{
+										if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
+										{
+											calculate_new_velocity1(motion_i, motion_j, false);
+											continue;
+										}
+									}
+								}
+
+								if (is_blockj && !IsTutorial)//if is tutorial, skip particle collision check
+								{
+									if (particles_blocks_collide(motion_i, motion_j))
+									{
+										Particle& physics = registry.particle.get(cell[i]);
+										Motion& motion1 = registry.motions.get(adjacentCell[k]);
+										Motion& motion2 = registry.motions.get(adjacentCell[k]);
+										if (is_lavai)
+										{
+											Lava& p = registry.lava.get(cell[i]);
+											bool horizontal = isHorizontal(motion1, motion2);
+											if (!horizontal)
+											{
+												calculate_new_velocity_lava(motion1, p.ifHit);
+												p.ifHit = true;
+											}
+											if (horizontal)
+											{
+												motion1.velocity.x *= -1;
+											}
+										}
+										else
+										{
+											motion1.velocity.y = 0.f;
+											motion1.velocity.x = 0.f;
+										}
+										physics.gravity = 0.f;
+										physics.collision = true;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+
+		}
+
+
+
+
+		//checkCollisionsWithAdjacentCells(cell[i], grid, x, y, motion_i);
+	}
+
+
+
+	//}
 //}
 
 
 
-void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<Entity>>> grid, bool IsTutorial)
+	return;
+}
+
+std::mutex queueMutex;
+std::atomic<bool> done(false);
+void PhysicsSystem::worker(std::vector<std::vector<std::vector<Entity>>>& grid, bool IsTutorial, vec2 boundary, std::queue<std::pair<int, int>>& queue, int workerid) {
+	while (!done) {
+		// Process the next available cell
+		queueMutex.lock();
+		if (!queue.empty()) {
+			auto task = queue.front();
+			queue.pop();
+			queueMutex.unlock();
+			checkCollisionInChunks(grid, task.first, task.second, IsTutorial, boundary);
+		}
+		else {
+			// If no more tasks are available, exit.
+			done = true;
+			queueMutex.unlock();
+		}
+	}
+}
+
+
+std::queue<std::pair<int, int>> taskQueue; // Queue to hold the grid cell coordinates (y, x)
+
+void PhysicsSystem::parallelCollisionSetup(std::vector<std::vector<std::vector<Entity>>>& grid, bool IsTutorial, vec2 boundary) {
+
+	int numThreads = std::thread::hardware_concurrency();
+	std::vector<std::thread> threads;
+
+	int gridHeight = grid.size();
+	int gridWidth = gridHeight; // 7*7
+
+
+
+	// fill up task queue with coordinates
+	for (int y = 0; y < gridHeight; ++y) {
+		for (int x = 0; x < gridWidth; ++x) {
+			taskQueue.push({ y, x });
+		}
+	}
+
+	//create and start threads
+	for (int i = 0; i < numThreads; ++i) {
+		std::thread t(&PhysicsSystem::worker, this, std::ref(grid), IsTutorial, boundary, std::ref(taskQueue), i);
+		threads.push_back(std::move(t));
+	}
+
+	//std::thread worker1(&PhysicsSystem::worker, this, std::ref(grid), IsTutorial, boundary, std::ref(taskQueue));
+	//worker1.join();
+
+
+	//worker(grid, IsTutorial, boundary, taskQueue);
+	//std::thread worker1(&PhysicsSystem::checkCollisionInChunks,this, std::ref(grid), 0,0, IsTutorial, boundary);
+	//worker1.join();
+
+
+	for (auto& thread : threads) {
+		thread.join();  // Wait for all threads to finish
+	}
+	
+	done = false;
+}
+
+
+void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<Entity>>>& grid, bool IsTutorial)
 {
 	// Move fish based on how much time has passed, this is to (partially) avoid
 	// having entities move at different speed based on the machine.
-	Player *player1;
+	Player* player1;
 
 	float gravity = 980.f;
-	auto &motion_container = registry.motions;
-	auto &grav_container = registry.gravities;
+	auto& motion_container = registry.motions;
+	auto& grav_container = registry.gravities;
 	bool performanceTimer = false;
 	auto start = std::chrono::high_resolution_clock::now();
 	if (motion_container.size() >= 400)
@@ -407,11 +738,11 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 		performanceTimer = true;
 		start = std::chrono::high_resolution_clock::now();
 	}
-		
+
 	vec2 boundary;
 	for (uint i = 1; i < motion_container.size(); i++)
 	{
-		Motion &motion = motion_container.components[i];
+		Motion& motion = motion_container.components[i];
 		Entity entity = motion_container.entities[i];
 		if (!motion.isActive) continue;
 		float step_seconds = elapsed_ms / 1000.f;
@@ -424,7 +755,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 			float width = abs(motion.scale.x);
 			float height = abs(motion.scale.y);
 
-			Player &player = registry.players.get(entity);
+			Player& player = registry.players.get(entity);
 			player1 = &player;
 			PLAYER = entity;
 			boundary = checkBoundaryPlayer(motion, player);
@@ -501,7 +832,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 			}
 
 			motion.position.y += motion.velocity.y * step_seconds;
-		} 
+		}
 		else if (registry.particle.has(entity))
 		{
 			Particle& physics = registry.particle.get(entity);
@@ -532,24 +863,6 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 
 
-	if (performanceTimer)
-	{
-		auto end = std::chrono::high_resolution_clock::now();
-
-		// Calculate the duration
-		std::chrono::duration<double, std::milli> duration = end - start;
-		std::cout << "Time taken by loop: " << duration.count() << " ms" << std::endl;
-	}
-
-
-
-
-
-
-
-
-
-	
 
 	////// Gravity
 	for (Entity entity : registry.gravities.entities)
@@ -568,445 +881,18 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 	}
 
 
-	//timer:
-	start = std::chrono::high_resolution_clock::now(); 
-	std::chrono::duration<double, std::milli> duration1 = start - start;
-	auto end1 = start;
+	//return;
+	start = std::chrono::high_resolution_clock::now();
+	parallelCollisionSetup(grid, IsTutorial, boundary);
+	auto end = std::chrono::high_resolution_clock::now();
 
-
-	//if (flag == 0) 
-	//	goto COLLISION2;
-	for (int y = 0; y < grid.size(); y++) {      // Iterate over rows
-		for (int x = 0; x < grid.size(); x++) {  // Iterate over columns in each row
-			// Access the cell at (x, y)
-			std::vector<Entity>& cell = grid[y][x];
-			
-
-
-			for (int i = 0; i < cell.size(); i++)
-			{
-				
-				if (!registry.motions.has(cell[i])) continue;
-				Entity& entity_i = cell[i];
-				Motion& motion_i = registry.motions.get(cell[i]);
-				bool is_playeri = registry.players.has(cell[i]);
-				bool is_blocki = registry.blocks.has(cell[i]);
-				bool is_rock1 = registry.gravities.has(cell[i]);
-				bool is_particlei = registry.particle.has(cell[i]);
-				bool is_lavai = registry.lava.has(cell[i]);
-
-				for (int j = 0; j < cell.size(); j++)
-				{
-					if (!registry.motions.has(cell[j]) || i == j) continue;
-					Motion& motion_j = registry.motions.get(cell[j]);
-					Entity& entity_j = cell[j];
-					bool is_blockj = registry.blocks.has(cell[j]);
-					bool is_particlej = registry.particle.has(cell[j]);
-					bool is_lavaj = registry.lava.has(cell[j]);
-					if ((is_playeri && is_blockj))   //checking player
-					{
-
-						if (collides(motion_i, motion_j))
-						{
-							vec2 delta = motion_i.position - motion_j.position;
-							if (abs(delta.x) < abs(delta.y))
-							{
-								if (delta.y <= 0)
-								{
-									motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
-
-								}
-
-							}
-
-							registry.collisions.emplace_with_duplicates(entity_i, entity_j);
-
-						}
-					}
-					else if (is_playeri && is_lavaj)
-					{
-						if (collides(motion_i, motion_j))
-						registry.collisions.emplace_with_duplicates(entity_i, entity_j);
-					}
-					else if (is_blocki && is_blockj)  //checking rocks
-					{
-						bool isRock = registry.gravities.has(cell[i]) == 1;
-						bool collided = false;
-						if (isRock)
-						{
-							Gravity& g = registry.gravities.get(cell[i]);
-							g.moveable_down = true;
-							if (collidesVertically(motion_i, motion_j))
-							{
-								vec2 delta = motion_i.position - motion_j.position;
-								if (abs(delta.x) < abs(delta.y))
-								{
-									if (delta.y <= 0)
-									{
-										motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
-
-									}
-
-								}
-								g.moveable_down = false;
-								break;
-
-							}
-
-
-						}
-					}
-					else if (is_particlei) 
-					{
-						Particle& physics = registry.particle.get(cell[i]);
-						//Motion& motion1 = registry.motions.get(cell[i]);
-						//Motion& motion2 = registry.motions.get(cell[j]);
-						physics.collision = false;
-						if (is_particlej)  // particle collision
-						{
-							if (!registry.lava.has(entity_i) && !registry.lava.has(entity_j))
-							{
-								if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
-								{
-									calculate_new_velocity1(motion_i, motion_j, false);
-									continue;
-								}
-							}
-
-
-						}
-						if (is_blockj && !IsTutorial) //skip particle collision in tutorial
-						{
-							if (particles_blocks_collide(motion_i, motion_j))
-							{
-								if (is_lavai)
-								{
-									Lava& p = registry.lava.get(cell[i]);
-									bool horizontal = isHorizontal(motion_i, motion_j);
-									if (!horizontal)
-									{
-										calculate_new_velocity_lava(motion_i, p.ifHit);
-										p.ifHit = true;
-									}
-									if (horizontal)
-									{
-										motion_i.velocity.x *= -1;
-									}
-
-								}
-								else
-								{
-									motion_i.velocity.y = 0.f;
-									motion_i.velocity.x = 0.f;
-
-								}
-
-								physics.gravity = 0.f;
-								physics.collision = true;
-								vec2 delta = motion_i.position - motion_j.position;
-								if (abs(delta.x) < abs(delta.y))
-								{
-									if (delta.y <= 0)
-									{
-										motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
-
-									}
-
-								}
-							}
-
-						}
-
-
-
-						if (motion_i.position.x - motion_i.scale.x <= boundary.x || motion_i.position.x + motion_i.scale.x >= boundary.y)
-							motion_i.velocity.x *= -1;
-					}
-				}
-
-
-				if (is_rock1)
-				{
-					Gravity& g = registry.gravities.get(cell[i]);
-					if (g.moveable_down == true)
-					{
-						// Check the cell that is one unit down
-						int belowY = y + 1;
-						if (belowY < grid.size()) {  // Ensure we are within grid bounds
-							std::vector<Entity>& belowCell = grid[belowY][x];
-							for (Entity& entity_below : belowCell) {
-								Motion& motion_below = registry.motions.get(entity_below);
-
-								if (collidesVertically(motion_i, motion_below)) {
-
-									vec2 delta = motion_i.position - motion_below.position;
-									if (abs(delta.x) < abs(delta.y)) {
-										if (delta.y <= 0) {
-											motion_i.position.y = motion_below.position.y - motion_below.scale.y / 2 - motion_i.scale.y / 2;
-										}
-									}
-									g.moveable_down = false;
-									break;
-									//registry.collisions.emplace_with_duplicates(entity_i, entity_below);
-								}
-							}
-						}
-					}
-
-
-				}
-				else
-				{
-					
-					auto start1 = std::chrono::high_resolution_clock::now();
-
-					// Check collisions with adjacent cells
-					for (int adjY = y - 1; adjY <= y + 1; adjY++) {
-						for (int adjX = x - 1; adjX <= x + 1; adjX++) {
-							// Ensure we are within grid bounds and not checking the current cell
-							if (adjX >= 0 && adjX < grid.size() && adjY >= 0 && adjY < grid.size() && (adjX != x || adjY != y)) {
-								std::vector<Entity>& adjacentCell = grid[adjY][adjX];
-
-								for (int k = 0; k < adjacentCell.size(); k++) {
-									Motion& motion_j = registry.motions.get(adjacentCell[k]);
-									Entity& entity_j = adjacentCell[k];
-									bool is_blockj = registry.blocks.has(adjacentCell[k]);
-									bool is_particlej = registry.particle.has(adjacentCell[k]);
-									bool is_lavaj = registry.lava.has(adjacentCell[k]);
-
-
-									if (is_playeri && is_blockj) {
-										if (collides(motion_i, motion_j)) {
-											vec2 delta = motion_i.position - motion_j.position;
-											if (abs(delta.x) < abs(delta.y))
-											{
-												if (delta.y <= 0)
-												{
-													motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
-
-												}
-
-											}
-
-											registry.collisions.emplace_with_duplicates(entity_i, entity_j);
-										}
-									}
-									else if (is_particlei)
-									{
-										if (is_particlej)
-										{
-											if (!registry.lava.has(entity_i) && !registry.lava.has(entity_j))
-											{
-												if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
-												{
-													calculate_new_velocity1(motion_i, motion_j, false);
-													continue;
-												}
-											}
-										}
-
-										if (is_blockj && !IsTutorial)//if is tutorial, skip particle collision check
-										{
-											if (particles_blocks_collide(motion_i, motion_j))
-											{
-												Particle& physics = registry.particle.get(cell[i]);
-												Motion& motion1 = registry.motions.get(adjacentCell[k]);
-												Motion& motion2 = registry.motions.get(adjacentCell[k]);
-												if (is_lavai)
-												{
-													Lava& p = registry.lava.get(cell[i]);
-													bool horizontal = isHorizontal(motion1, motion2);
-													if (!horizontal)
-													{
-														calculate_new_velocity_lava(motion1, p.ifHit);
-														p.ifHit = true;
-													}
-													if (horizontal)
-													{
-														motion1.velocity.x *= -1;
-													}
-												}
-												else
-												{
-													motion1.velocity.y = 0.f;
-													motion1.velocity.x = 0.f;
-												}
-												physics.gravity = 0.f;
-												physics.collision = true;
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-					if (performanceTimer)
-					{
-						auto end1 = std::chrono::high_resolution_clock::now();
-
-						// Calculate the duration
-						duration1 += end1 - start1;
-						
-					}
-
-				}
-
-
-
-
-				//checkCollisionsWithAdjacentCells(cell[i], grid, x, y, motion_i);
-			}
-
-
-
-		}
-	}
-
+	// Calculate the duration
 	if (performanceTimer)
 	{
-		auto end = std::chrono::high_resolution_clock::now();
-
-		// Calculate the duration
 		std::chrono::duration<double, std::milli> duration = end - start;
-		std::cout << "Time taken by Whole collision check: " << duration.count() << " ms" << std::endl;
-		std::cout << "Time taken by adj check: " << duration1.count() << " ms" << std::endl;
+		std::cout << "Time taken by loop: " << duration.count() << " ms" << std::endl;
 	}
+	
+	
 
-
-	return;
-
-
-COLLISION2:  // old collision check
-
-	// Check for collisions between all moving entities
-	//for (uint i = 0; i < motion_container.components.size(); i++)
-	//{
-	//	
-	//	Motion &motion_i = motion_container.components[i];
-	//	Entity entity_i = motion_container.entities[i];
-	//	
-	//	if (registry.background.has(entity_i)) continue;
-	//	// note starting j at i+1 to compare all (i,j) pairs only once (and to not compare with itself)
-	//	for (uint j = i + 1; j < motion_container.components.size(); j++)
-	//	{
-	//		Motion &motion_j = motion_container.components[j];
-	//		Entity entity_j = motion_container.entities[j];
-	//		bool isParCollision = false;
-
-	//		if (registry.physics.has(entity_i) && registry.physics.has(entity_j))
-	//		{
-	//			if (MovingTowardsEachOther(motion_i, motion_j) && particles_collide(motion_i, motion_j))
-	//			{
-	//				calculate_new_velocity1(motion_i, motion_j, false);
-	//				continue;
-	//			}
-
-	//		}
-
-	//		else if (registry.players.has(entity_i))
-	//		{
-	//			bool collisionDetected = false;
-
-	//			// If entity_j is a mesh, check for polygon collision
-	//			if (registry.meshPtrs.has(entity_j))
-	//			{
-	//				Mesh *meshPtr = registry.meshPtrs.get(entity_j);
-
-	//				// 	// std::cout << "Polygon vertices: ";
-	//				// 	// for (const vec2 &vertex : polygonVertices)
-	//				// 	// {
-	//				// 	// 	std::cout << "(" << vertex.x << ", " << vertex.y << ") ";
-	//				// 	// }
-	//				// 	// std::cout << std::endl;
-
-	//				if (meshPtr)
-	//				{
-	//					std::vector<vec2> relativePolygonVertices = meshPtr->extractPolygonVertices();
-
-	//					vec2 objectPosition = motion_j.position;
-
-	//					vec2 scaleValue = motion_j.scale;
-
-	//					std::vector<vec2> absolutePolygonVertices;
-	//					for (const vec2 &vertex : relativePolygonVertices)
-	//					{
-	//						vec2 scaledVertex = vertex * scaleValue;
-	//						absolutePolygonVertices.push_back(scaledVertex + objectPosition);
-	//					}
-
-	//					if (collides_with_polygon(motion_i, absolutePolygonVertices))
-	//					{
-	//						collisionDetected = true;
-	//					}
-	//				}
-	//				else
-	//				{
-	//					std::cout << "Mesh pointer for entity is NULL!" << std::endl;
-	//				}
-	//			}
-	//			else // Otherwise, check for basic collision
-	//			{
-	//				if (registry.physics.has(entity_j)) continue;
-	//				
-	//				if (collides(motion_i, motion_j))
-	//				{
-	//					collisionDetected = true;
-	//					// std::cout << "collisionDetected" << std::endl;
-	//				}
-	//			}
-
-	//			// If collision detected, handle collision
-	//			if (collisionDetected)
-	//			{
-	//				// Create a collisions event
-	//				vec2 delta = motion_i.position - motion_j.position;
-
-	//				if (abs(delta.x) < abs(delta.y))
-	//				{
-	//					if (delta.y <= 0)
-	//					{
-	//						motion_i.position.y = motion_j.position.y - motion_j.scale.y / 2 - motion_i.scale.y / 2;
-	//						//motion_j.position.y = motion_i.position.y - motion_i.scale.y / 2 + motion_j.scale.y / 2;
-	//					}
-	//					//else{
-	//					// 	motion_j.position.y = motion_i.position.y - motion_i.scale.y / 2 - motion_j.scale.y / 2;
-	//					// }
-	//				}
-	//				// We are abusing the ECS system a bit in that we potentially insert multiple collisions for the same entity
-	//				registry.collisions.emplace_with_duplicates(entity_i, entity_j);
-	//				registry.collisions.emplace_with_duplicates(entity_j, entity_i);
-	//			}
-	//			
-	//			else {
-	//				player1->moveable_down = true;
-	//				player1->moveable_up = true;
-	//				player1->moveable_right = true;
-	//				player1->moveable_left = true;
-	//			}
-	//		}
-	//		else if (collides1(motion_i, motion_j, &isParCollision))
-	//		{
-	//			if (isParCollision)
-	//			{
-	//				registry.particleCollisions.emplace_with_duplicates(entity_i, entity_j);
-	//				registry.particleCollisions.emplace_with_duplicates(entity_j, entity_i);
-	//				continue;
-	//			}
-	//		}
-	//		/*else
-	//		{
-	//			if (registry.physics.has(entity_i))
-	//			{
-	//				registry.physics.get(entity_i).collision = false;
-	//			}
-	//			if (registry.physics.has(entity_j))
-	//			{
-	//				registry.physics.get(entity_j).collision = false;
-	//			}
-	//		}*/
-
-	//		
-	//	}
-	//}
-	handleParticleCollision();
 }

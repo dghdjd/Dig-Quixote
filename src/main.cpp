@@ -47,11 +47,11 @@ int main()
 			(float)(std::chrono::duration_cast<std::chrono::microseconds>(now - t)).count() / 1000;
 		t = now;
 		bool IsTutorial;
-		std::vector<std::vector<std::vector<Entity>>> list;
-		list = world_system.step(elapsed_ms, IsTutorial);
+		std::vector<std::vector<std::vector<Entity>>> grid;
+		grid = world_system.step(elapsed_ms, IsTutorial);
 
-		
-		physics_system.step(elapsed_ms, list, IsTutorial);
+		if(grid.size() != 0)
+		physics_system.step(elapsed_ms, grid, IsTutorial);
 
 		world_system.handle_collisions();
 

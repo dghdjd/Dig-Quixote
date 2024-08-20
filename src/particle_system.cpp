@@ -78,7 +78,7 @@ void ParticleSystem::CreateParticles(const Motion& blockM)
 	}
 }
 
-void ParticleSystem::ActivateParticle() {
+void ParticleSystem::ActivateParticle(std::vector<Entity>& particles) {
 	for (auto& particle : particles) {
 		Motion& m = registry.motions.get(particle);
 		m.isActive = true; // Activate the particle

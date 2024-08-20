@@ -416,11 +416,11 @@ Entity createParticle(vec2 pos, vec2 size, float angle, float random)
 
 	// Create and (empty) Salmon component to be able to refer to all turtles
 	//registry.hardShells.emplace(entity);
-	//registry.renderRequests.insert(
-	//	entity,
-	//	{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no txture is needed
-	//		EFFECT_ASSET_ID::PARTICLE,
-	//		GEOMETRY_BUFFER_ID::PARTICLE });
+	registry.renderRequests.insert(
+		entity,
+		{ TEXTURE_ASSET_ID::TEXTURE_COUNT, // TEXTURE_COUNT indicates that no txture is needed
+			EFFECT_ASSET_ID::PARTICLE,
+			GEOMETRY_BUFFER_ID::PARTICLE });
 
 	return entity;
 }

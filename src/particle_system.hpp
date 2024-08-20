@@ -18,7 +18,7 @@ public:
 
 	void CreateParticles(const Motion& blockM);
 
-	void ActivateParticle();
+	void ActivateParticle(std::vector<Entity>& particles);
 
 
 	
