@@ -18,7 +18,9 @@ public:
 
 	void CreateParticles(const Motion& blockM);
 
-	void ActivateParticle(std::vector<Entity>& particles);
+	void ActivateLavaParticle(std::vector<Entity>& particles);
+
+	void CreateHundredsParticles(vec2 position, int amount);
 
 
 	

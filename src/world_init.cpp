@@ -4,6 +4,17 @@
 #include <iostream>
 #include<random>
 
+
+
+
+int CalculateScale()
+{
+	const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+
+	return mode->height;
+}
+
+
 Entity createPlayer(RenderSystem *renderer, vec2 pos)
 {
 	auto entity = Entity();
@@ -433,7 +444,7 @@ Entity createLavaParticles(vec2 pos, vec2 size, float angle, float random)
 	Particle& particleSystem = registry.particle.get(entity);
 	float gravity = particleSystem.gravity;
 
-	float bubble_speed = 5.f;
+	float bubble_speed = 2.5;
 	float bubble_angle = (1 / 2) * (M_PI / 4); // [-pi/4, pi/4] 
 
 	//std::cout << "Random number: " << bubble_angle << std::endl;

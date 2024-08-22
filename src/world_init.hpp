@@ -3,19 +3,28 @@
 #include "common.hpp"
 #include "tiny_ecs.hpp"
 #include "render_system.hpp"
+#include "world_system.hpp"
+
 
 // These are ahrd coded to the dimensions of the entity texture
 const int MAP_WIDTH = 20;
 const int MAP_HEIGHT = 20;
 
-const float BLOCK_BB_WIDTH = 100.f / 2;		// 0.4f * 296.f;
-const float BLOCK_BB_HEIGHT = 100.f / 2;		// 0.4f * 296.f;
+//const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+//extern int* scale;
+
+
+
+const float BLOCK_BB_WIDTH = 100.f / 2.5;		// 0.4f * 296.f;
+const float BLOCK_BB_HEIGHT = 100.f / 2.5;		// 0.4f * 296.f;
 
 const float BUTTON_BB_WIDTH = 200.f;		
 const float BUTTON_BB_HEIGHT = 100.f;
 
 const float PLAYER_BB_WIDTH = 40.f;
 const float PLAYER_BB_HEIGHT = 40.f;
+
+int CalculateScale();
 
 // the player
 Entity createPlayer(RenderSystem* renderer, vec2 pos);

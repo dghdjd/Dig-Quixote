@@ -1,5 +1,6 @@
 // internal
 #include "physics_system.hpp"
+#include "physics_calculation.hpp"
 #include "world_init.hpp"
 #include "world_system.hpp"
 #include "iostream"
@@ -7,222 +8,9 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-// Returns the local bounding coordinates scaled by the current size of the entity
-vec2 get_bounding_box(const Motion& motion)
-{
-	// abs is to avoid negative scale due to the facing direction.
-	return { abs(motion.scale.x), abs(motion.scale.y) };
-}
-
-bool PhysicsSystem::collides_pos(const vec2 pos, const Motion& motion2)
-{
-	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
-	vec2 max2 = motion2.position + get_bounding_box(motion2) / 2.f;
-
-	return pos.x <= max2.x &&
-		pos.x >= min2.x &&
-		pos.y <= max2.y &&
-		pos.y >= min2.y;
-}
-bool PhysicsSystem::collidesVertically(const Motion& motion1, const Motion& motion2) {
-	if (motion1.position.x != motion2.position.x) return false;
-	if (motion1.position.y >= motion2.position.y) return false;
-	float circle_bottom = motion1.position.y + (get_bounding_box(motion1).y) / 2.f;
-	//if (motion1.position.x != motion2.position.x) return false;
-	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
-	vec2 max2 = motion2.position + get_bounding_box(motion2) / 2.f;
-
-	bool isColliding = circle_bottom >= min2.y && circle_bottom <= max2.y;
-
-	return isColliding;
-}
-
-bool PhysicsSystem::collides(const Motion& motion1, const Motion& motion2)
-{
-
-	vec2 fur_pos = motion1.position + motion1.velocity / 1000.f;
-	// motion1's position is the center of the circle
-	vec2 circle_center = fur_pos;
-	float circle_radius = (get_bounding_box(motion1).x) / 2.f; // Assuming x is width of the bounding box
-
-	// Calculate AABB for motion2
-	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
-	vec2 max2 = motion2.position + get_bounding_box(motion2) / 2.f;
-
-	// Find the point in AABB of motion2 that is closest to the center of motion1's circle
-	float closestX = std::max(min2.x, std::min(circle_center.x, max2.x));
-	float closestY = std::max(min2.y, std::min(circle_center.y, max2.y));
-
-	// Calculate the distance between the circle's center and this closest point
-	float distanceX = circle_center.x - closestX;
-	float distanceY = circle_center.y - closestY;
-
-	// Check if the distance is less than the circle's radius
-	return (distanceX * distanceX + distanceY * distanceY) <= ((circle_radius * circle_radius));
-}
-bool particles_collide(const Motion& motion1, const Motion& motion2)
-{
-
-	vec2 circle1_center = motion1.position;
-	float circle1_radius = motion1.mass / 2;  //mass = radius
-
-	vec2 circle2_center = motion2.position;
-	float circle2_radius = motion2.mass / 2;
-
-	vec2 center_diff = circle1_center - circle2_center;
-	float distance_squared = sqrt(center_diff.x * center_diff.x + center_diff.y * center_diff.y);
-
-	float radii_sum = circle1_radius + circle2_radius;
-
-	return distance_squared <= radii_sum;
-}
-bool particles_blocks_collide(Motion& motion1, Motion& motion2)
-{
-	// motion1's position is the center of the circle
-	vec2 circle_center = motion1.position;
-	float circle_radius = motion1.mass / 2.f; // Assuming x is width of the bounding box
-
-	// Calculate AABB for motion2
-	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
-	vec2 max2 = motion2.position + get_bounding_box(motion2) / 2.f;
-
-	// Find the point in AABB of motion2 that is closest to the center of motion1's circle
-	float closestX = std::max(min2.x, std::min(circle_center.x, max2.x));
-	float closestY = std::max(min2.y, std::min(circle_center.y, max2.y));
-	if (motion1.position.y >= motion2.position.y - motion2.scale.x)
-	{
-		float i = 2;
-	}
-
-	// Calculate the distance between the circle's center and this closest point
-	float distanceX = circle_center.x - closestX;
-	float distanceY = circle_center.y - closestY;
-
-	bool colliding = (distanceX * distanceX + distanceY * distanceY) <= (circle_radius * circle_radius);
-
-	return colliding;
-}
-bool isHorizontal(const Motion& motion1, const Motion& motion2)
-{
-	// motion1's position is the center of the circle
-	vec2 circle_center = motion1.position;
-	float circle_radius = motion1.mass / 2.f; // Assuming x is width of the bounding box
-
-	// Calculate AABB for motion2
-	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
-	vec2 max2 = motion2.position + get_bounding_box(motion2) / 2.f;
-	// Find the point in AABB of motion2 that is closest to the center of motion1's circle
-	float closestX = std::max(min2.x, std::min(circle_center.x, max2.x));
-	float closestY = std::max(min2.y, std::min(circle_center.y, max2.y));
-	// Calculate the distance between the circle's center and this closest point
-	float distanceX = circle_center.x - closestX;
-	float distanceY = circle_center.y - closestY;
-
-	// Check if the distance is less than the circle's radius
-	bool isColliding = (distanceX * distanceX + distanceY * distanceY) <= (circle_radius * circle_radius);
-
-	bool isVerticalEdge = closestY > min2.y && closestY < max2.y;
 
 
-	return (closestX == min2.x || closestX == max2.x) && isVerticalEdge && isColliding;
-}
-bool collides1(Motion& motion1, Motion& motion2, bool* isParCollision)
-{
-	if (motion1.isblock && motion2.isPar)
-	{
-		*isParCollision = true;
-		if (particles_blocks_collide(motion2, motion1))
-			return true;
-		return false;
-	}
-	else if (motion2.isblock && motion1.isPar)
-	{
-		*isParCollision = true;
-		if (particles_blocks_collide(motion1, motion2))
-			return true;
-		return false;
-	}
-	return false;
 
-}
-
-void calculate_new_velocity_lava(Motion& motion1, bool ifhit)
-{
-	float randomVelocity = (rand() % 201) - 100;
-
-	if (!ifhit) motion1.velocity.x = randomVelocity;
-	motion1.velocity.y = -motion1.velocity.y * 0.3;
-}
-
-bool PhysicsSystem::point_in_circle(const vec2& point, const vec2& circle_center, float circle_radius)
-{
-	float dx = point.x - circle_center.x;
-	float dy = point.y - circle_center.y;
-	return dx * dx + dy * dy <= circle_radius * circle_radius;
-}
-
-bool PhysicsSystem::edge_intersects_circle(const vec2& edge_start, const vec2& edge_end, const vec2& circle_center, float circle_radius)
-{
-	vec2 edge = edge_end - edge_start;
-	vec2 circle_to_start = edge_start - circle_center;
-
-	float t = dot(circle_to_start, edge) / dot(edge, edge);
-	vec2 closest_point;
-	if (t < 0)
-		closest_point = edge_start;
-	else if (t > 1)
-		closest_point = edge_end;
-	else
-		closest_point = edge_start + t * edge;
-
-	return point_in_circle(closest_point, circle_center, circle_radius);
-}
-
-bool PhysicsSystem::collides_with_polygon(const Motion& motion1, const std::vector<vec2>& vertices)
-{
-	vec2 circle_center = motion1.position;
-	float circle_radius = get_bounding_box(motion1).x / 2.f;
-
-	// Check if any vertex of the polygon is inside the circle
-	for (const vec2& vertex : vertices)
-	{
-		if (point_in_circle(vertex, circle_center, circle_radius))
-		{
-			//std::cout << "Crashed with point!" << time << std::endl;
-			return true;
-		}
-	}
-
-	// Check if any edge of the polygon intersects the circle
-	for (size_t i = 0; i < vertices.size(); i++)
-	{
-		vec2 start = vertices[i];
-		vec2 end = vertices[(i + 1) % vertices.size()];
-		if (edge_intersects_circle(start, end, circle_center, circle_radius))
-		{
-			//std::cout << "Crashed with edge!" << time << std::endl;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-/*
-bool PhysicsSystem::collides(const Motion &motion1, const Motion &motion2)
-{
-	vec2 min1 = motion1.position - get_bounding_box(motion1) / 2.f;
-	vec2 max1 = motion1.position + get_bounding_box(motion1) / 2.f;
-
-	vec2 min2 = motion2.position - get_bounding_box(motion2) / 2.f;
-	vec2 max2 = motion2.position + get_bounding_box(motion2) / 2.f;
-
-	return min1.x <= max2.x &&
-		   max1.x >= min2.x &&
-		   min1.y <= max2.y &&
-		   max1.y >= min2.y;
-}
-*/
 
 float lerp(float current, float goal, float delta)
 {
@@ -244,136 +32,6 @@ float lerp(float current, float goal, float delta)
 	}
 	return current;
 }
-
-vec2 getMaxMinVertices(Entity entity)
-{
-	Mesh* mesh = registry.meshPtrs.get(entity);
-	std::vector<ColoredVertex> vectices1 = mesh->vertices;
-	vec2 minVertex = vec2(0.f, 0.f);
-	vec2 maxVertex = vec2(0.f, 0.f);
-
-	for (const ColoredVertex& vertex : vectices1)
-	{
-		minVertex.x = std::min(minVertex.x, vertex.position.x);
-		minVertex.y = std::min(minVertex.y, vertex.position.y);
-		maxVertex.x = std::max(maxVertex.x, vertex.position.x);
-		maxVertex.y = std::max(maxVertex.y, vertex.position.y);
-	}
-	float width = maxVertex.x - minVertex.x;
-	float height = maxVertex.y - minVertex.y;
-	return vec2(width, height);
-}
-
-bool MovingTowardsEachOther(const Motion& motion1, const Motion& motion2) {
-	vec2 relativeVelocity = motion2.velocity - motion1.velocity;
-	vec2 positionDifference = motion2.position - motion1.position;
-	float dotProduct = relativeVelocity.x * positionDifference.x + relativeVelocity.y * positionDifference.y;
-
-	return dotProduct < 0;
-}
-
-void calculate_new_velocity1(Motion& motion1, Motion& motion2, bool isBlock) {
-	float m1 = motion1.mass;
-	vec2 v1 = motion1.velocity;
-	vec2 p1 = motion1.position;
-	float m2 = motion2.mass;
-	vec2 v2 = motion2.velocity;
-	vec2 p2 = motion2.position;
-
-	vec2 p_diff = p1 - p2;
-	vec2 v_diff = v1 - v2;
-
-	vec2 p_diff1 = p2 - p1;
-	vec2 v_diff1 = v2 - v1;
-
-	// Calculate the dot product of the velocity difference and position difference vectors.
-	float diff_dot = dot(v_diff, p_diff);
-	float diff_dot1 = dot(v_diff1, p_diff1);
-
-	// Calculate the magnitude squared of the position difference vector.
-	float diff_mag_squared = dot(p_diff, p_diff);
-	float diff_mag_squared1 = dot(p_diff1, p_diff1);
-
-	float f1 = 2 * m2;
-	float f2 = 2 * m1;
-
-	float sum = m1 + m2;
-
-	float d1 = f1 / sum;
-	float d2 = f2 / sum;
-
-	float scalar = d1 * (diff_dot / diff_mag_squared);
-	float scalar1 = d2 * (diff_dot1 / diff_mag_squared1);
-
-	//// Calculate the scalar factor for the collision response.
-	//float scalar = (2 * m2 / (m1 + m2)) * (diff_dot / diff_mag_squared);
-	//float scalar1 = (2 * m1 / (m1 + m2)) * (diff_dot1 / diff_mag_squared1);
-	// Calculate the new velocities based on the scalar factor and the position difference vector.
-	vec2 new_speed1 = v1 - (scalar * p_diff);
-	vec2 new_speed2 = v2 - (scalar1 * p_diff1);
-
-	// Update the velocities of the motions.
-	motion1.velocity = new_speed1;
-	motion2.velocity = new_speed2;
-}
-
-
-
-
-
-
-void PhysicsSystem::handleParticleCollision()
-{
-	auto& collisionsRegistry1 = registry.particleCollisions;
-	float restitutionCoefficient = 1.f;
-	for (uint i = 0; i < collisionsRegistry1.components.size(); i++) {
-		Entity entity = collisionsRegistry1.entities[i];
-		Entity entity_other = collisionsRegistry1.components[i].other_entity;
-
-		if (registry.particle.has(entity) && registry.lava.has(entity_other))
-		{
-			Particle& physics = registry.particle.get(entity);
-			Motion& motion1 = registry.motions.get(entity);
-
-			motion1.velocity.y = 0.f;
-			motion1.velocity.x = 0.f;
-			//motion1.velocity.x -= 1.f;
-			//if (motion1.velocity.x < 0.f) motion1.velocity.x = 0.f;
-
-			physics.gravity = 0.f;
-			physics.collision = true;
-
-		}
-		if (registry.particle.has(entity) && registry.players.has(entity_other))
-		{
-			Motion& p_motion = registry.motions.get(entity_other);
-			Motion& par_motion = registry.motions.get(entity);
-			par_motion.velocity.x += p_motion.velocity.x * 100.f;
-
-		}
-	}
-	registry.particleCollisions.clear();
-}
-
-vec2 PhysicsSystem::checkBoundaryPlayer(const Motion& motion, Player& player) {
-	int w = WorldSystem::get_window_width();
-	int h = WorldSystem::get_window_height();
-	int b_left = w / 2.f - 10 * BLOCK_BB_WIDTH + BLOCK_BB_WIDTH / 4.f;
-	int b_right = w / 2.f + 10 * BLOCK_BB_WIDTH - BLOCK_BB_WIDTH / 4.f;
-
-	if (motion.position.x <= b_left) {
-		player.moveable_left = false;
-	}
-	if (motion.position.x >= b_right) {
-		player.moveable_right = false;
-	}
-	return vec2(b_left, b_right);
-}
-
-
-
-
-
 
 void PhysicsSystem::checkCollisionInChunks(std::vector<std::vector<std::vector<Entity>>>& grid, int y, int x, bool IsTutorial, vec2 boundary)
 {
@@ -517,9 +175,18 @@ void PhysicsSystem::checkCollisionInChunks(std::vector<std::vector<std::vector<E
 				}
 
 
-
-				if (motion_i.position.x - motion_i.scale.x <= boundary.x || motion_i.position.x + motion_i.scale.x >= boundary.y)
+				if (motion_i.position.x <= boundary.x ) //-motion_i.scale
+				{
 					motion_i.velocity.x *= -1;
+					motion_i.position.x = boundary.x;
+				}
+				else if(motion_i.position.x >= boundary.y)
+				{
+					motion_i.velocity.x *= -1;
+					motion_i.position.x = boundary.y;
+				}
+					
+
 			}
 		}
 
@@ -557,7 +224,7 @@ void PhysicsSystem::checkCollisionInChunks(std::vector<std::vector<std::vector<E
 		else
 		{
 
-			auto start1 = std::chrono::high_resolution_clock::now();
+			
 
 			// Check collisions with adjacent cells
 			for (int adjY = y - 1; adjY <= y + 1; adjY++) {
@@ -609,31 +276,43 @@ void PhysicsSystem::checkCollisionInChunks(std::vector<std::vector<std::vector<E
 									if (particles_blocks_collide(motion_i, motion_j))
 									{
 										Particle& physics = registry.particle.get(cell[i]);
-										Motion& motion1 = registry.motions.get(adjacentCell[k]);
-										Motion& motion2 = registry.motions.get(adjacentCell[k]);
+										//Motion& motion1 = registry.motions.get(adjacentCell[k]);
+										//Motion& motion2 = registry.motions.get(adjacentCell[k]);
 										if (is_lavai)
 										{
 											Lava& p = registry.lava.get(cell[i]);
-											bool horizontal = isHorizontal(motion1, motion2);
+											bool horizontal = isHorizontal(motion_i, motion_j);
 											if (!horizontal)
 											{
-												calculate_new_velocity_lava(motion1, p.ifHit);
+												calculate_new_velocity_lava(motion_i, p.ifHit);
 												p.ifHit = true;
 											}
 											if (horizontal)
 											{
-												motion1.velocity.x *= -1;
+												motion_i.velocity.x *= -1;
 											}
 										}
 										else
 										{
-											motion1.velocity.y = 0.f;
-											motion1.velocity.x = 0.f;
+											motion_i.velocity.y = 0.f;
+											motion_i.velocity.x = 0.f;
 										}
 										physics.gravity = 0.f;
 										physics.collision = true;
 									}
 								}
+
+								if (motion_i.position.x <= boundary.x) //-motion_i.scale
+								{
+									motion_i.velocity.x *= -1;
+									motion_i.position.x = boundary.x;
+								}
+								else if (motion_i.position.x >= boundary.y)
+								{
+									motion_i.velocity.x *= -1;
+									motion_i.position.x = boundary.y;
+								}
+
 							}
 						}
 					}
@@ -679,7 +358,6 @@ void PhysicsSystem::worker(std::vector<std::vector<std::vector<Entity>>>& grid, 
 	}
 }
 
-
 std::queue<std::pair<int, int>> taskQueue; // Queue to hold the grid cell coordinates (y, x)
 
 void PhysicsSystem::parallelCollisionSetup(std::vector<std::vector<std::vector<Entity>>>& grid, bool IsTutorial, vec2 boundary) {
@@ -721,7 +399,6 @@ void PhysicsSystem::parallelCollisionSetup(std::vector<std::vector<std::vector<E
 	done = false;
 }
 
-
 void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<Entity>>>& grid, bool IsTutorial)
 {
 	// Move fish based on how much time has passed, this is to (partially) avoid
@@ -750,7 +427,6 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 		if (registry.players.has(entity))
 		{
-			vec2 widthHeight = getMaxMinVertices(entity);
 			//			std::cout << "Vector2D: (" << widthHeight.x << ", " << widthHeight.y << ")" << std::endl;
 			float width = abs(motion.scale.x);
 			float height = abs(motion.scale.y);
@@ -861,9 +537,6 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 	}
 
-
-
-
 	////// Gravity
 	for (Entity entity : registry.gravities.entities)
 	{
@@ -880,19 +553,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 
 	}
 
-
 	//return;
-	start = std::chrono::high_resolution_clock::now();
 	parallelCollisionSetup(grid, IsTutorial, boundary);
-	auto end = std::chrono::high_resolution_clock::now();
-
-	// Calculate the duration
-	if (performanceTimer)
-	{
-		std::chrono::duration<double, std::milli> duration = end - start;
-		std::cout << "Time taken by loop: " << duration.count() << " ms" << std::endl;
-	}
-	
-	
 
 }

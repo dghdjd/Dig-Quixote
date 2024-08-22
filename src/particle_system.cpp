@@ -3,6 +3,16 @@
 #include "world_init.hpp"
 #include "tiny_ecs_registry.hpp"
 
+void ParticleSystem::CreateHundredsParticles(vec2 position, int amount)
+{
+	for (int i = 0; i < amount; i++)
+	{
+		Entity particle;
+		particle = createParticle(position, particle_size, 0, 0);
+		registry.colors.insert(particle, WhiteParticles);
+	}
+}
+
 void ParticleSystem::CreateParticlesAtCollisionEdge(const Motion& playerM, const Motion& blockM, float random, vec3 color)
 {
 	glm::vec2 newPosition = { 0.f, 0.f };
@@ -47,16 +57,17 @@ void ParticleSystem::CreateParticlesAtCollisionEdge(const Motion& playerM, const
 void ParticleSystem::CreateParticlesWhenBroken(const Motion& blockM, vec3 color)
 {
 	Entity particle;
-	int offset = BLOCK_BB_WIDTH / 10;
+	
+	int offset = BLOCK_BB_WIDTH / 5;
 	float x = blockM.position.x - blockM.scale.x / 2;
 	float y = blockM.position.y - blockM.scale.y / 2;
 	vec2 position = { x,y };
 	vec2 new_position = { 0,0 };
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		new_position.y = position.y + offset * i;
 		new_position.x = position.x;
-		for (int j = 0; j < 10; j++)
+		for (int j = 0; j < 5; j++)
 		{
 			new_position.x = position.x + offset * j;
 			particle = createParticle(new_position, particle_size, 0, 0);
@@ -78,7 +89,7 @@ void ParticleSystem::CreateParticles(const Motion& blockM)
 	}
 }
 
-void ParticleSystem::ActivateParticle(std::vector<Entity>& particles) {
+void ParticleSystem::ActivateLavaParticle(std::vector<Entity>& particles) {
 	for (auto& particle : particles) {
 		Motion& m = registry.motions.get(particle);
 		m.isActive = true; // Activate the particle

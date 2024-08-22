@@ -1,5 +1,6 @@
 // Header
 #include "world_system.hpp"
+#include "physics_calculation.hpp"
 #include "world_init.hpp"
 #include "render_system.hpp"
 #include "particle_system.hpp"
@@ -39,6 +40,8 @@ int WorldSystem::window_height;
 
 ParticleSystem particle_system;
 Map map;
+
+Timer* LavaTimer;
 
 // Create the fish world
 WorldSystem::WorldSystem()
@@ -99,6 +102,7 @@ void WorldSystem::get_resolution()
 
 	window_width = mode->width;
 	window_height = mode->height;
+	
 }
 
 // World initialization
@@ -283,9 +287,9 @@ void WorldSystem::handleDigging(float elapsed_ms_since_last_update, bool hit, Mo
 		Motion& b_motion = registry.motions.get(entity);
 		Block& block = registry.blocks.get(entity);
 
-		if (PhysicsSystem::collides_pos(mouse_pos, b_motion))
+		if (if_mouse_collides_pos(mouse_pos, b_motion))
 		{
-			if (PhysicsSystem::collides(playerM, b_motion))
+			if (collides(playerM, b_motion))
 			{
 				if (block.type == 2 || block.type == 6 || block.type == 9)
 				{
@@ -296,7 +300,7 @@ void WorldSystem::handleDigging(float elapsed_ms_since_last_update, bool hit, Mo
 			}
 		}
 
-		if (PhysicsSystem::collides_pos(mouse_pos, b_motion))
+		if (if_mouse_collides_pos(mouse_pos, b_motion))
 		{
 			if (block.type == 666)
 			{
@@ -475,6 +479,7 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 	if (isLeftMouseButtonPressed)
 	{
 		// dig
+		//particle_system.CreateHundredsParticles(mouse_pos, 400);
 		handleDigging(elapsed_ms_since_last_update, hit, playerM);
 	}
 
@@ -536,6 +541,22 @@ std::vector<std::vector<std::vector<Entity>>> WorldSystem::step(float elapsed_ms
 	screen.screen_darken_factor = 1 - min_timer_ms / 3000;
 
 	mapState == 0 ? IsTutorial = true : IsTutorial = false;
+
+	if (mapState == 2 && LavaTimer)
+	{
+		LavaTimer->timer_ms -= elapsed_ms_since_last_update;
+		if (LavaTimer->timer_ms <= 0)
+		{
+			particle_system.ActivateLavaParticle(LavaParticles);
+			registry.timer.remove(PLAYER);
+			LavaTimer = nullptr;
+		}
+			
+
+		
+	}
+
+
 	return grid;
 
 }
@@ -582,7 +603,7 @@ void WorldSystem::restart_game(GameStateChange sc)
 		//generateRandomUIMap();
 	}
 	else {
-		//mapState = 4;
+		//mapState = 2;
 		// Background control
 		if (mapState == 0)
 		{
@@ -608,19 +629,19 @@ void WorldSystem::restart_game(GameStateChange sc)
 		// Create a new salmon
 		PLAYER = createPlayer(renderer, { window_width / 2 - BLOCK_BB_WIDTH / 2, 0.f });
 		registry.colors.insert(PLAYER, { 1, 0.8f, 0.8f });
-		//mesh_block = createMeshBlock(renderer, { window_width / 2 - BLOCK_BB_WIDTH / 2 + 100.f, 0.f });
-		//registry.colors.insert(mesh_block, { 1, 1, 1 });
 
 
-		//////////////////////////////////////////////////////////////
-		
+		//////////////////////////////////////////////////////////////create lava particles
+		Motion& player_m = registry.motions.get(PLAYER);
+		Player& player_p = registry.players.get(PLAYER);
+		vec2 boundary = checkBoundaryPlayer(player_m, player_p);
 		std::vector<Entity> p;
 		float pSize = 3.5 * 2;
 		vec2 pos = { 800.f, -pSize };
 		for (int i = 0; i < 200; i++)
 		{
 			pos.y -= pSize;
-			pos.x = 800.f;
+			pos.x = boundary.y - (2 * BLOCK_BB_WIDTH); //create lava particles at about the second block from the right
 			for (int j = 0; j < 2; j++)
 			{
 				pos.x += pSize;
@@ -700,17 +721,17 @@ void WorldSystem::handle_collisions()
 					{
 						Gate& temp_gate = registry.gates.get(other_entity);
 						//std::cout << temp_gate.id << std::endl;
-						if (temp_gate.id != gate.id && !temp_gate.used)
+						if (temp_gate.id != gate.id && !temp_gate.used) //checking gate
 						{
 							Motion& p_motion = registry.motions.get(entity);
 							p_motion.position = vec2{ temp_gate.position.x, temp_gate.position.y - BLOCK_BB_HEIGHT / 2 };
-							//std::cout << p_motion.position.x << "  " << p_motion.position.y << std::endl;
-							// entities_to_remove.push_back(other_entity);
-							// entities_to_remove.push_back(entity_other);
 							temp_gate.used = true;
 							gate.used = true;
-							//registry.remove_all_components_of(other_entity);
 							Mix_PlayChannel(-1, teleport, 0);
+							if (mapState == 2)                       //if use gate in map 2, set a 5 sec timer to activate lava particles
+							{
+								LavaTimer = &registry.timer.emplace(PLAYER); 
+							}
 							break;
 						}
 						Player& player = registry.players.get(entity);
@@ -876,7 +897,7 @@ void WorldSystem::on_key(int key, int, int action, int mod)
 
 	if (action == GLFW_RELEASE && key == GLFW_KEY_P)
 	{
-		particle_system.ActivateParticle(LavaParticles);
+		particle_system.ActivateLavaParticle(LavaParticles);
 	}
 
 
@@ -903,7 +924,7 @@ void WorldSystem::on_mouse_button(int button, int action, int mods)
 		Button& t_button = registry.buttons.get(tutorial);
 		Motion& t_motion = registry.motions.get(tutorial);
 
-		bool is_entered = PhysicsSystem::collides_pos(mouse_pos, t_motion);
+		bool is_entered = if_mouse_collides_pos(mouse_pos, t_motion);
 
 		if (is_entered && (!t_button.is_clicked))
 		{
@@ -930,6 +951,8 @@ void WorldSystem::on_mouse_button(int button, int action, int mods)
 						isLeftMouseButtonPressed = true;
 						motion.attack = true;
 						motion.idling = false;
+						
+						
 					}
 					else if (action == GLFW_RELEASE)
 					{
