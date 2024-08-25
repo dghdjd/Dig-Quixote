@@ -6,6 +6,10 @@
 
 
 
+float BLOCK_BB_HEIGHT = 1;
+float BLOCK_BB_WIDTH = 1;
+float PLAYER_BB_HEIGHT = 1;
+float PLAYER_BB_WIDTH = 1;
 
 int CalculateScale()
 {
@@ -14,6 +18,26 @@ int CalculateScale()
 	return mode->height;
 }
 
+void initialize_scale_size(int window_height)
+{
+	float scale_size;
+	switch (window_height)
+	{
+	case 2160 :
+		scale_size = 2;
+		break;
+	case 4320:
+		scale_size = 1.5;
+		break;
+	default:
+		scale_size = 2.5;
+	}
+	//window_height == 2160 ? scale_size = 2 : scale_size = 2.5;
+	BLOCK_BB_HEIGHT = 100.f / scale_size;
+	BLOCK_BB_WIDTH = BLOCK_BB_HEIGHT;
+	PLAYER_BB_HEIGHT = BLOCK_BB_HEIGHT - 5.f; //slightly smaller than blocks
+	PLAYER_BB_WIDTH = PLAYER_BB_HEIGHT;
+}
 
 Entity createPlayer(RenderSystem *renderer, vec2 pos)
 {
@@ -24,8 +48,8 @@ Entity createPlayer(RenderSystem *renderer, vec2 pos)
 	// registry.meshPtrs.emplace(entity, &mesh);
 
 	// Store a reference to the potentially re-used mesh object
-	Mesh &mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
-	registry.meshPtrs.emplace(entity, &mesh);
+	//Mesh &mesh = renderer->getMesh(GEOMETRY_BUFFER_ID::SPRITE);
+	//registry.meshPtrs.emplace(entity, &mesh);
 
 	// Setting initial motion values
 	Motion &motion = registry.motions.emplace(entity);
@@ -37,9 +61,11 @@ Entity createPlayer(RenderSystem *renderer, vec2 pos)
 	Game& game = registry.game.emplace(entity);
 	game.state = GameState::PLAY;
 
-	motion.scale = (mesh.original_size * 90.f) / 2.5f;
+	//motion.scale = (mesh.original_size * 90.f) / 2.5f;
+	//motion.scale = (mesh.original_size * 90.f) / 2.5f;
 
-	// motion.scale = vec2({ PLAYER_BB_WIDTH, PLAYER_BB_HEIGHT });
+
+	motion.scale = vec2({ PLAYER_BB_WIDTH, PLAYER_BB_HEIGHT });
 	motion.scale.x *= -1; // point front to the right
 
 	registry.players.emplace(entity);

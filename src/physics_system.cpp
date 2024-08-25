@@ -79,6 +79,8 @@ void PhysicsSystem::checkCollisionInChunks(std::vector<std::vector<std::vector<E
 					registry.collisions.emplace_with_duplicates(entity_i, entity_j);
 
 				}
+				
+				
 			}
 			else if (is_playeri && is_lavaj)
 			{
@@ -440,6 +442,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 			if (player.moveable_right == false)
 			{
 				if (motion.velocityGoal.x <= 0.f)
+				
 				{
 					motion.velocity.x = 0;
 					motion.velocity.x = lerp(motion.velocity.x, motion.velocityGoal.x, time);
@@ -460,6 +463,7 @@ void PhysicsSystem::step(float elapsed_ms, std::vector<std::vector<std::vector<E
 					motion.velocity.x = lerp(motion.velocity.x, motion.velocityGoal.x, time);
 					motion.position.x = motion.position.x + motion.velocity.x * step_seconds;
 					player.moveable_left = true;
+
 				}
 				else
 				{

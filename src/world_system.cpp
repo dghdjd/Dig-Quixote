@@ -1,5 +1,6 @@
 // Header
 #include "world_system.hpp"
+#include "world_init.hpp"
 #include "physics_calculation.hpp"
 #include "world_init.hpp"
 #include "render_system.hpp"
@@ -102,6 +103,7 @@ void WorldSystem::get_resolution()
 
 	window_width = mode->width;
 	window_height = mode->height;
+	initialize_scale_size(window_height);
 	
 }
 
@@ -333,7 +335,7 @@ void WorldSystem::handleDigging(float elapsed_ms_since_last_update, bool hit, Mo
 				registry.remove_all_components_of(*block_remove);
 
 
-			if(mapState != 0)
+			if(mapState != 0 && !registry.explosions.has(*block_remove))
 			particle_system.CreateParticlesWhenBroken(m_block, particle_system.BrownParticles);
 
 			holdTime = 0.f;
@@ -635,25 +637,13 @@ void WorldSystem::restart_game(GameStateChange sc)
 		Motion& player_m = registry.motions.get(PLAYER);
 		Player& player_p = registry.players.get(PLAYER);
 		vec2 boundary = checkBoundaryPlayer(player_m, player_p);
-		std::vector<Entity> p;
-		float pSize = 3.5 * 2;
-		vec2 pos = { 800.f, -pSize };
-		for (int i = 0; i < 200; i++)
-		{
-			pos.y -= pSize;
-			pos.x = boundary.y - (2 * BLOCK_BB_WIDTH); //create lava particles at about the second block from the right
-			for (int j = 0; j < 2; j++)
-			{
-				pos.x += pSize;
-				p.push_back(createLavaParticles(pos, { 2,2 }, 0.0, 0.0));
-			}
 
-		}
-		LavaParticles = p;
+		particle_system.CreateLavaParticles(LavaParticles, boundary);
 
 		/////////////////////////////////////////////////////////////
 
 		// Map control
+		initialize_scale_size(window_height);
 		if (mapState == 0)
 		{
 			map.generateTutorialMapDEMO(window_width, window_height, renderer);
@@ -690,6 +680,7 @@ void WorldSystem::handle_collisions()
 {
 	// Loop over all collisions detected by the physics system
 	auto& collisionsRegistry = registry.collisions;
+	bool player_horizontal_collision = false;
 	for (uint i = 0; i < collisionsRegistry.components.size(); i++)
 	{
 		// The entity and its collider
@@ -699,7 +690,8 @@ void WorldSystem::handle_collisions()
 		// For now, we are only interested in collisions that involve the player
 		if (registry.players.has(entity))
 		{
-
+			Player& player = registry.players.get(entity);
+			Motion& p_motion = registry.motions.get(entity);
 			if (registry.blocks.has(entity_other))
 			{
 				Block b = registry.blocks.get(entity_other);
@@ -709,7 +701,10 @@ void WorldSystem::handle_collisions()
 
 					registry.deathTimers.emplace(PLAYER);
 					Mix_PlayChannel(-1, salmon_dead_sound, 0);
-					registry.colors.get(PLAYER) = vec3(1, 0, 0);
+					particle_system.CreateParticlesWhenDead(p_motion);
+					p_motion.velocity *= 0;
+					p_motion.velocityGoal *= 0;
+					registry.renderRequests.remove(PLAYER);
 				}
 				else if (b.type == 8)
 				{
@@ -723,7 +718,7 @@ void WorldSystem::handle_collisions()
 						//std::cout << temp_gate.id << std::endl;
 						if (temp_gate.id != gate.id && !temp_gate.used) //checking gate
 						{
-							Motion& p_motion = registry.motions.get(entity);
+							
 							p_motion.position = vec2{ temp_gate.position.x, temp_gate.position.y - BLOCK_BB_HEIGHT / 2 };
 							temp_gate.used = true;
 							gate.used = true;
@@ -734,7 +729,7 @@ void WorldSystem::handle_collisions()
 							}
 							break;
 						}
-						Player& player = registry.players.get(entity);
+						
 						player.moveable_down = false;
 					}
 				}
@@ -744,22 +739,34 @@ void WorldSystem::handle_collisions()
 					Motion& b_motion = registry.motions.get(entity_other);
 					vec2 delta = p_motion.position - b_motion.position;
 
-					Player& player = registry.players.get(entity);
+					//Player& player = registry.players.get(entity);
 					if (abs(delta.x) > abs(delta.y))
 					{
 						// Horizontal collision
 						if (delta.x < 0)
 						{
 							// collision on the right side of `a`
-							if (b_motion.position.y - abs(b_motion.scale.y) / 2 < p_motion.position.y + abs(p_motion.scale.y) * 3 / 8)
+							if (b_motion.position.y - abs(b_motion.scale.y) / 2 < p_motion.position.y + abs(p_motion.scale.y))
+							{
 								player.moveable_right = false;
+								player_horizontal_collision = true;
+							}
+								
+
+							
 						}
 						else if (delta.x > 0)
 						{
 							// collision on the left side of `a`
 							// prevent movement to the left
-							if (b_motion.position.y - abs(b_motion.scale.y) / 2 < p_motion.position.y + abs(p_motion.scale.y) * 3 / 8)
+							if (b_motion.position.y - abs(b_motion.scale.y) / 2 < p_motion.position.y + abs(p_motion.scale.y))
+							{
 								player.moveable_left = false;
+								player_horizontal_collision = true;
+							}
+								
+							
+
 						}
 					}
 					else if (abs(delta.x) < abs(delta.y))
@@ -769,17 +776,24 @@ void WorldSystem::handle_collisions()
 						{
 							// collision on the top of `a`
 							// prevent upward movement
+							//player.moveable_left = false;
 							player.moveable_up = false;
+							player_horizontal_collision = true;
+							
 						}
 						else if (delta.y < 0)
 						{
 							// collision on the bottom of `a`
 							// prevent downward movement
+							//player.moveable_left = false;
 							player.moveable_down = false;
+							player_horizontal_collision = true;
+							
 						}
 					}
 				}
-			}
+			} 
+			
 			if (registry.lava.has(entity_other))
 			{
 
@@ -787,23 +801,25 @@ void WorldSystem::handle_collisions()
 					registry.deathTimers.emplace(PLAYER);
 					Mix_PlayChannel(-1, salmon_dead_sound, 0);
 					Motion& m = registry.motions.get(entity);
-					m.velocityGoal * 0.f;
-					m.velocity * 0.f;
+					m.velocityGoal *= 0.f;
+					m.velocity *= 0.f;
+					particle_system.CreateParticlesWhenDead(m);
+					registry.renderRequests.remove(PLAYER);
+
 
 				}
 			}
-			/*if (registry.meshPtrs.has(entity_other))
-			{
-				Motion& p_motion = registry.motions.get(entity);
-				Motion& b_motion = registry.motions.get(entity_other);
-				b_motion.velocity += p_motion.velocity / 2.f;
-
-			}*/
 		}
 	}
 
 	// Remove all collisions from this simulation step
 	registry.collisions.clear();
+
+	if (!player_horizontal_collision)
+	{
+		Player& player = registry.players.get(PLAYER);
+		player.clear_horizontal_movement();
+	}
 }
 
 // Should the game be over ?
@@ -825,13 +841,13 @@ void WorldSystem::on_key(int key, int, int action, int mod)
 		{
 			if (key == GLFW_KEY_D)
 			{
-				motion.velocityGoal.x = 250.f;
+				motion.velocityGoal.x = motion.speed;
 				motion.turnRight = true;
 				motion.idling = false;
 			}
 			else if (key == GLFW_KEY_A)
 			{
-				motion.velocityGoal.x = -250.f;
+				motion.velocityGoal.x = -motion.speed;
 				motion.turnRight = false;
 				motion.idling = false;
 			}
@@ -857,7 +873,7 @@ void WorldSystem::on_key(int key, int, int action, int mod)
 				Player p = registry.players.get(PLAYER);
 				if (!p.moveable_down)
 				{
-					motion.velocity.y = -350.f;
+					motion.velocity.y = motion.jump_height;
 				}
 			}
 		}

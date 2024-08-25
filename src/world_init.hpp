@@ -14,15 +14,21 @@ const int MAP_HEIGHT = 20;
 //extern int* scale;
 
 
-
-const float BLOCK_BB_WIDTH = 100.f / 2.5;		// 0.4f * 296.f;
-const float BLOCK_BB_HEIGHT = 100.f / 2.5;		// 0.4f * 296.f;
+//static float BLOCK_BB_WIDTH = 100.f / scale_size;		// 0.4f * 296.f;
+//static float BLOCK_BB_HEIGHT = 100.f / scale_size;		// 0.4f * 296.f;
+extern float BLOCK_BB_WIDTH;		// 0.4f * 296.f;
+extern float BLOCK_BB_HEIGHT;		// 0.4f * 296.f;
 
 const float BUTTON_BB_WIDTH = 200.f;		
 const float BUTTON_BB_HEIGHT = 100.f;
 
-const float PLAYER_BB_WIDTH = 40.f;
-const float PLAYER_BB_HEIGHT = 40.f;
+extern float PLAYER_BB_WIDTH;
+extern float PLAYER_BB_HEIGHT;
+
+
+
+void initialize_scale_size(int window_height);
+
 
 int CalculateScale();
 

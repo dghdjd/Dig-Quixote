@@ -7,6 +7,7 @@
 // Player component
 struct Player
 {
+	bool horizontally_colliding = false;
 	bool moveable_right = true;
 	bool moveable_left = true;
 	bool moveable_up = true;
@@ -28,6 +29,12 @@ struct Player
 	int max_attack_state = 14;
 
 	bool win = false;
+
+	void clear_horizontal_movement()
+	{
+		this->moveable_right = true;
+		this->moveable_left = true;
+	}
 };
 
 // Basic blocks
@@ -95,6 +102,8 @@ struct Motion {
 	bool idling = true;
 	bool attack = false;
 	int mass = 1.f;
+	float speed = 150.f;
+	float jump_height = -350.f;
 
 	bool isblock = false;
 	bool isPar = false;
