@@ -2,6 +2,11 @@
 
 Welcome to Dig-Quixote, a unique block-digging adventure game where you navigate through various levels, interact with different block types, and explore new game mechanics.
 
+# How to run the game
+
+The game is built using CMake and Visual Studio 2022.
+
+
 
 ## Milestone 1
 
